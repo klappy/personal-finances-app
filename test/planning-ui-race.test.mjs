@@ -66,7 +66,15 @@ test('confirmed notes save restores the source inspector without a full dashboar
  const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),callback=source.slice(source.indexOf('const queuedSave=createSaveQueue('),source.indexOf('function updateDraftRecovery()'));
  const previous=globalThis.document,node=tag=>({tag,textContent:'',children:[],append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children}});globalThis.document={createElement:node};
  try{const host=node('div'),status=node('p'),more=node('button'),data={_revision:3},queried=[];const inspector=createSourceInspector({host,status,more,getContext:()=>({revision:data._revision}),request:async()=>{queried.push(data._revision);return {revision:data._revision,total:0,items:[],summary:{candidate_links:0,candidate_targets_missing:0},accepted_matches:0};}});
- await inspector.refresh();const context={createSaveQueue,structuredClone,data,sourceInspector:inspector,fetch:async()=>({ok:true,status:200,json:async()=>({revision:4})}),confirmedDecisions:{},transactionRequest:0,transactionReport:{old:true}};
+ await inspector.refresh();const context={createSaveQueue,structuredClone,data,sourceInspector:inspector,recordSourceReader:{invalidate(){}},fetch:async()=>({ok:true,status:200,json:async()=>({revision:4})}),confirmedDecisions:{},transactionRequest:0,transactionReport:{old:true}};
  const saved=await vm.runInNewContext(callback+';queuedSave({notes:"Updated notes"});',context);await Promise.resolve();assert.equal(saved.ok,true);assert.equal(data._revision,4);assert.deepEqual(queried,[3,4]);assert.match(status.textContent,/0 original source records/);assert.doesNotMatch(status.textContent,/unavailable/);assert.equal(context.transactionReport,null);
  }finally{globalThis.document=previous;}
+});
+
+test('applied reload invalidates editor source evidence while refused and failed reloads retain it',async()=>{
+ const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),loader=source.slice(source.indexOf('async function load(options={}'),source.indexOf('\ndocument.querySelectorAll',source.indexOf('async function load(options={}')));
+ const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{textContent:'',replaceChildren(){},append(){}});return nodes.get(id)};let invalidations=0;
+ const snapshot={_revision:4,transactions:[],overrides:{transactions:{},budgets:{},commitments:{},notes:'saved'}},context={$,loadWithSaveGuard,structuredClone,queuedSave:{pending:0,activity:0},data:{_revision:3},overrides:{notes:'saved'},hasUnsavedChanges:()=>true,updateDraftRecovery:()=>{},recordSourceReader:{invalidate(){invalidations++;}},transactionRequest:0,transactionReport:{},document:{querySelectorAll:()=>[]},Option:function(){},render(){},fetch:async()=>({ok:true,json:async()=>snapshot})};
+ await vm.runInNewContext(loader+';load();',context);assert.equal(invalidations,0);context.hasUnsavedChanges=()=>false;context.fetch=async()=>{throw Error('offline')};await vm.runInNewContext('load();',context);assert.equal(invalidations,0);
+ context.fetch=async()=>({ok:true,json:async()=>snapshot});await vm.runInNewContext('load();',context);assert.equal(invalidations,1);assert.equal(context.data._revision,4);
 });

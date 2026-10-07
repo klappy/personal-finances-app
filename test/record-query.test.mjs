@@ -1,4 +1,20 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {recordQuery} from '../record-query.mjs';
+import {recordSourceEvidence} from '../record-query.mjs';
+test('source labels follow declared locators rather than legacy bank-match assertions',()=>{
+ const row={id:'one',source:'Giving receipt + bank debit',source_refs:[{source_id:'snapshot',source_line:'one',source_type:'Snapshot'}]},evidence=recordSourceEvidence(row);assert.equal(evidence.custody_status,'derivative_only');assert.equal(evidence.bank_match_verified,false);assert.equal(evidence.reported_origin,row.source);assert.equal(evidence.display_label,'Snapshot · derivative evidence');
+ assert.equal(recordSourceEvidence({id:'one',source:'Era'}).custody_status,'missing');
+ const receipt=recordSourceEvidence({id:'one',source_refs:[{source_id:'receipt',source_line:'2',source_type:'Receipt'}]});assert.equal(receipt.custody_status,'declared_original_only');assert.equal(receipt.bank_match_verified,false);
+});
+test('duplicate, conflicting, unknown and split-parent locators retain uncertainty without corroboration claims',()=>{
+ const ref={source_id:'source',source_line:'2',source_type:'Snapshot'},duplicate=recordSourceEvidence({id:'child',parent_transaction_id:'parent',source_refs:[ref,{...ref}]});assert.equal(duplicate.reference_count,1);assert.equal(duplicate.reference_scope,'canonical_parent');assert.equal(duplicate.canonical_record_id,'parent');
+ const conflict=recordSourceEvidence({id:'one',source_refs:[ref,{...ref,source_type:'Statement'}]});assert.equal(conflict.reference_count,1);assert.equal(conflict.custody_status,'unresolved_declarations');
+ const unknown=recordSourceEvidence({id:'one',source_refs:[{...ref,source_type:'Mystery'},{}]});assert.equal(unknown.invalid_reference_count,1);assert.deepEqual(unknown.unknown_source_types,['Mystery']);assert.equal(unknown.custody_status,'unresolved_declarations');
+ const mixed=recordSourceEvidence({id:'one',source_refs:[ref,{source_id:'receipt',source_line:'2',source_type:'Receipt'}]});assert.equal(mixed.custody_status,'mixed');assert.equal(mixed.source_complete_verified,false);
+});
+test('record publication and docs cannot mutate retained source references or descriptor schema',async()=>{
+ const rows=[{id:'one',date:'2026-07-01',account:'Fixture',source_refs:[{source_id:'snapshot',source_line:'one',source_type:'Snapshot'}]}],before=structuredClone(rows),published=recordQuery(rows,['2026-07']);published.items[0].source_refs[0].source_type='Receipt';published.items[0].source_evidence.references[0].source_types.push('Statement');assert.deepEqual(rows,before);
+ const docs=await operate(empty(),'docs');assert.equal(docs.record_source_contract,'record-source-evidence@1');docs.record_source_schema.properties.bank_match_verified.const=true;assert.equal((await operate(empty(),'docs')).record_source_schema.properties.bank_match_verified.const,false);
+});
 test('record selection summaries describe all matches rather than one page',()=>{
  const rows=[{id:'b',date:'2026-07-01',merchant:'Market',description:'Food',account:'Fixture',scope:'Household',spend:10.01},{id:'a',date:'2026-07-01',merchant:'Market',account:'Fixture',scope:'Household',spend:20.02}],before=JSON.stringify(rows),result=recordQuery(rows,['2026-07','2026-08'],{search:'market',limit:1});assert.equal(result.items[0].id,'a');assert.equal(result.total,2);assert.equal(result.next_offset,1);assert.equal(result.summary.spending.period_total,30.03);assert.equal(result.summary.spending.recorded_average_per_selected_month,15.02);assert.equal(JSON.stringify(rows),before);assert.throws(()=>recordQuery(rows,['2026-07'],{limit:201}),/pagination/);
 });

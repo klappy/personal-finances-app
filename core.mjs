@@ -3,7 +3,7 @@ import {operationDefinitions,operationRoutes} from './capability-contract.mjs';
 import {classificationPurposes,prepareClassificationRequest,interpretClassificationResult} from './classification-contract.mjs';
 import {accountProjection} from './account-projection.mjs';
 import {validateRuntimeEvidence,planRuntimeEvidence} from './runtime-evidence.mjs';
-import {recordQuery} from './record-query.mjs';
+import {recordQuery,recordSourceSchema} from './record-query.mjs';
 import {evidenceProjection} from './evidence-projection.mjs';
 import {givingEvidence} from './giving-evidence.mjs';
 import {validateDecisions} from './decisions.mjs';
@@ -50,7 +50,7 @@ export async function operate(state,name,args={},actor=null,provider=null){
   draft.dashboard_context.runtime_evidence_refs={...(draft.dashboard_context.runtime_evidence_refs||{}),[runtimeEvidence.source_id]:{source_id:runtimeEvidence.source_id,source_type:'Snapshot',source_hash:runtimeEvidence.source_hash,payload_hash:receipt.payload_hash,observed_at:runtimeEvidence.observed_at}};
   draft.imports[args.idempotency_key]=receipt;draft.revision++;Object.assign(state,draft);return receipt;
  }
- if(name==='docs')return structuredClone({version:VERSION,source_observation_limits:observationLimits,source_observation_schema:sourceObservationSchema,capabilities:operationDefinitions.map(operation=>operation.name),operations:operationDefinitions,operation_routes:operationRoutes,classification_contract:'finance-classification@1',automatic_acceptance:false,jev_configured:!!provider,limitations:['Normalized imports only','No direct Era refresh','No PDF extraction','Remote OAuth client grant and deployed parity unverified','Production promotion and deployed parity verification pending']});
+ if(name==='docs')return structuredClone({version:VERSION,record_source_contract:'record-source-evidence@1',record_source_schema:recordSourceSchema,source_observation_limits:observationLimits,source_observation_schema:sourceObservationSchema,capabilities:operationDefinitions.map(operation=>operation.name),operations:operationDefinitions,operation_routes:operationRoutes,classification_contract:'finance-classification@1',automatic_acceptance:false,jev_configured:!!provider,limitations:['Normalized imports only','No direct Era refresh','No PDF extraction','Remote OAuth client grant and deployed parity unverified','Production promotion and deployed parity verification pending']});
  if(name==='decision_update'){const decisions=validateDecisions(state,args.decisions);const draft=structuredClone(state);draft.dashboard_context.overrides=decisions;
   for(const [id,decision] of Object.entries(decisions.transactions)){const record=draft.transactions[id];if(record&&!decision.splits&&!record.attributes?.splits&&['group','category','purpose'].some(k=>Object.hasOwn(decision,k)))record.classification=classification({...record.classification,...Object.fromEntries(['group','category','purpose'].filter(k=>Object.hasOwn(decision,k)).map(k=>[k,decision[k]]))});}
   const event={id:randomUUID(),actor,revision:state.revision+1,created_at:new Date().toISOString(),before:hash(state.dashboard_context.overrides),after:hash(decisions),before_decisions:structuredClone(state.dashboard_context.overrides),after_decisions:structuredClone(decisions),kind:'decision_document_updated'};draft.decision_events=[...(draft.decision_events||[]),event];draft.revision++;Object.assign(state,draft);return {revision:state.revision,event_id:event.id};}

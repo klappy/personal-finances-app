@@ -19,3 +19,5 @@
 .source-fields dd {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}
 .source-candidate {padding:12px 0;border-top:1px solid var(--line);}
 @media(max-width:700px){.source-columns{grid-template-columns:1fr;gap:12px}.source-fields{grid-template-columns:1fr}.source-fields dd{margin-bottom:8px}}
+
+.record-source-evidence {white-space:normal;overflow-wrap:anywhere;min-width:0;}
