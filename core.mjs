@@ -4,6 +4,7 @@ import {accountProjection} from './account-projection.mjs';
 import {validateRuntimeEvidence,planRuntimeEvidence} from './runtime-evidence.mjs';
 import {recordQuery} from './record-query.mjs';
 import {evidenceProjection} from './evidence-projection.mjs';
+import {givingEvidence} from './giving-evidence.mjs';
 import {validateDecisions} from './decisions.mjs';
 import {recordedFlows,aggregateFlows} from './flows.mjs';
 import {flowProjection} from './flow-projection.mjs';
@@ -64,7 +65,11 @@ export async function operate(state,name,args={},actor=null,provider=null){
   const snapshot=dashboardSnapshot(state),rows=dashboardRows(snapshot,snapshot.overrides,{scope:args.scope,period:args.period,hideReimbursed:args.hide_reimbursed}),months=args.period&&args.period!=='all'?[args.period]:snapshot.months;
   const sourceIndex=new Map();for(const source of Object.values(state.sources)){const refs=sourceIndex.get(source.transaction_id)||[];refs.push({source_id:source.source_id,source_line:source.source_line,source_type:source.source_type});sourceIndex.set(source.transaction_id,refs);}
   const evidence=rows.map(row=>({...row,source_refs:sourceIndex.get(row.parent_transaction_id||row.id)||[]}));
-  return {...evidenceProjection(evidence,months,snapshot.original_era_monthly_counts),revision:state.revision,collection:'evidence'};
+  const historySnapshot={...snapshot,months:[...new Set(snapshot.transactions.map(row=>row.date.slice(0,7)))]};
+  const scopeRowsForGiving=dashboardRows(historySnapshot,snapshot.overrides,{scope:args.scope,all:true});
+  const allRows=dashboardRows(historySnapshot,snapshot.overrides,{scope:'combined',all:true}).map(row=>({...row,source_refs:sourceIndex.get(row.parent_transaction_id||row.id)||[]}));
+  const contextRefs=[]; // Legacy context has no field-level custody reference; do not invent one from ledger sources.
+  return {...evidenceProjection(evidence,months,snapshot.original_era_monthly_counts),giving_trail:givingEvidence(snapshot.giving_trail,allRows,scopeRowsForGiving,months,contextRefs),revision:state.revision,collection:'evidence'};
  }
  if(name==='summarize'&&args.collection==='commitments'){
   if(Object.keys(args).some(key=>!['collection','scope'].includes(key)))fail('Commitment planning accepts scope only; it uses gross snapshot evidence');

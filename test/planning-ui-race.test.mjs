@@ -40,3 +40,13 @@ test('failed projection refresh clears category amount headings and dependent re
  assert.equal(context.currentReport,null);assert.equal(context.accountReport,null);assert.equal(context.planningReport,null);assert.equal(context.transactionReport,null);
  assert.equal($('more').hidden,true);assert.match($('save-status').textContent,/offline/);
 });
+
+import {loadWithSaveGuard} from '../frontend/save-queue.js';
+test('refused reload preserves the transaction report and in-flight request identity',async()=>{
+ const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),loader=source.slice(source.indexOf('async function load(options={}'),source.indexOf('\ndocument.querySelectorAll',source.indexOf('async function load(options={}')));
+ const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id)};
+ const report={summary:{record_count:3}},draft={notes:'unsaved'},context={$,loadWithSaveGuard,queuedSave:{pending:0,activity:0},overrides:draft,hasUnsavedChanges:()=>true,updateDraftRecovery:()=>{},transactionRequest:7,transactionReport:report,fetch:async()=>{throw Error('Unexpected read')}};
+ await vm.runInNewContext(loader+';load();',context);
+ assert.equal(context.transactionRequest,7);assert.equal(context.transactionReport,report);assert.equal(context.overrides,draft);assert.match($('save-status').textContent,/Unsaved edits/);
+ context.hasUnsavedChanges=()=>false;context.fetch=async()=>{throw Error('offline')};await vm.runInNewContext('load();',context);assert.equal(context.transactionRequest,7);assert.equal(context.transactionReport,report);assert.match($('save-status').textContent,/offline/);
+});

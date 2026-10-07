@@ -61,3 +61,6 @@ The overview must not assert reconciliation for named accounts from fixed copy. 
 
 ## Failed-save draft recovery
 Reloading source data must not replace a draft that differs from the last confirmed saved/loaded decision document. The client keeps the draft and offers export/save or an explicit Discard draft and reload action. Explicit discard does not bypass pending-save or read-crossed-by-edit guards; a failed reload retains the draft. This is local draft recovery, not a financial command or a new endpoint.
+
+## Historical giving evidence
+The evidence collection owns a giving trail projection, selected by receipt/funding date over the requested months. Historical receipt amounts are observed evidence, not additional spending or certified bank matches. Canonical ledger links establish scope membership only; missing links and parents split across scopes stay unresolved and outside attributed totals. Exact repeated receipt IDs collapse; conflicting repeated IDs remain unresolved. Funding remains an internal-transfer candidate and never increases giving spending. Snapshot custody references describe derivative evidence, not original receipt extraction. The UI formats these results without using stored whole-history totals or declaring reconciliation.
