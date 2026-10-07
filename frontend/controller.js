@@ -1,3 +1,4 @@
+import {createSourceInspector} from './source-inspector.js';
 import {createSaveQueue,loadWithSaveGuard} from './save-queue.js';
 import {commitmentDecision} from '../commitment-projection.mjs';
 import {classificationGroups,sum,purchasePlace,billName,scopeRows,dashboardRows,planningItems as sharedPlanningItems} from "../dashboard-domain.mjs";
@@ -12,6 +13,8 @@ let confirmedDecisions=structuredClone(overrides);
 const hasUnsavedChanges=()=>JSON.stringify(overrides)!==JSON.stringify(confirmedDecisions);
 const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n),short=n=>'$'+Math.round(n).toLocaleString('en-US');
 let currentReport=null,allReport=null,chartReport=null,projectionRequest=0,detailReports=[],planningReport=null,evidenceReport=null,cashReports=[],accountReport=null;
+const sourceInspector=createSourceInspector({host:$('source-observations'),status:$('source-observation-status'),more:$('more-source-observations'),getContext:()=>({revision:data._revision,scope:localStorage.getItem('home-budget-overview-scope')||'combined',months:$('source-date-filter').value==='all'?null:$('period').value==='all'?data.months:[$('period').value]}),request:async args=>{const response=await fetch('/api/capability',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'query',args})});const body=await response.json();if(!response.ok)throw Error(body.error||'Source query failed');return body;}});
+$('source-date-filter').onchange=()=>sourceInspector.refresh();
 const detailDimensions=[['kind','group','merchant'],['kind','group','category'],['kind','group','category','merchant'],['kind','group','category','detail'],['kind','group','category','detail','merchant'],['kind','group','travel_purpose'],['kind','group','travel_purpose','merchant'],['kind','purpose']];
 function detailSeries(dimensions,filters={}){return (detailReports.find(report=>JSON.stringify(report.dimensions)===JSON.stringify(dimensions))?.series||[]).filter(series=>series.dimensions.kind==='spending_commitment'&&Object.entries(filters).every(([key,value])=>series.dimensions[key]===value));}
 const reportSeries=(report,group)=>report?.series.find(r=>r.dimensions.kind==='spending_commitment'&&r.dimensions.group===group);
@@ -27,7 +30,7 @@ async function render(){
   if(sequence!==projectionRequest)return;
   if(results.some(r=>r.revision!==data._revision))throw Error('Source revision changed; reload before continuing');
   [currentReport,allReport,chartReport]=results.map(r=>r.projection);detailReports=results[0].rollups||[];planningReport=results[3];evidenceReport=results[4];cashReports=results[1].rollups||[];accountReport=results[5];$('baseline-mode').value=scope;renderContent();
- }catch(error){if(sequence!==projectionRequest)return;currentReport=allReport=chartReport=planningReport=evidenceReport=accountReport=transactionReport=null;detailReports=[];cashReports=[];++transactionRequest;['page-heroes','inflow-summary','kpis','outflow-kpis','chart','legend','category-table','category-title','category-detail','big-categories','cash-table','inflow-review','purpose-bars','wife-plan','funding-summary','commitment-summary','commitment-table','budget-table','budget-summary','transaction-table','transaction-count','card-snapshot-summary','card-snapshot-table','card-snapshot-status','baseline-summary','baseline-category-heroes','baseline-table','subscription-summary','subscription-table','source-reconciliation','account-source-months','coverage-table'].forEach(id=>$(id).replaceChildren());$('more').hidden=true;$('save-status').textContent='Core projection unavailable: '+error.message;}
+ }catch(error){if(sequence!==projectionRequest)return;sourceInspector.clear();currentReport=allReport=chartReport=planningReport=evidenceReport=accountReport=transactionReport=null;detailReports=[];cashReports=[];++transactionRequest;['page-heroes','inflow-summary','kpis','outflow-kpis','chart','legend','category-table','category-title','category-detail','big-categories','cash-table','inflow-review','purpose-bars','wife-plan','funding-summary','commitment-summary','commitment-table','budget-table','budget-summary','transaction-table','transaction-count','card-snapshot-summary','card-snapshot-table','card-snapshot-status','baseline-summary','baseline-category-heroes','baseline-table','subscription-summary','subscription-table','source-reconciliation','account-source-months','coverage-table'].forEach(id=>$(id).replaceChildren());$('more').hidden=true;$('save-status').textContent='Core projection unavailable: '+error.message;}
 }
 let visibleGroups=new Set(['Housing','Debt','Food','Shopping and home','Travel','AI','Insurance','Giving','Taxes','Digital services','Lifestyle','Transport','Health','Needs review','Business','Infrastructure','Other work']);
 const groups=[...classificationGroups],colors=['var(--series1)','var(--series7)','var(--series2)','var(--series3)','var(--series4)','var(--series5)','var(--series6)','#c1a276','#798cc2','#b590b5','#70a8a5','#c58289','#939f68','#749db3','#bd9a67','#908bab','#8da89d','#969696'];
@@ -98,7 +101,7 @@ function renderContent(){$('show-tata-funding').onchange=render;renderPlanning()
  table('wife-plan',['Bill','Expected/month'],currentReport.contribution_plan.items.map(item=>[item.bill,money(item.monthly_amount)]).concat([['Total',currentReport.contribution_plan.monthly_total===null?'Unknown':money(currentReport.contribution_plan.monthly_total)]]));
  $('funding-summary').replaceChildren(element('p','Classified wife receipts in selected period: '+money(currentReport.measures.wife_funding_received.period_total)),element('p',currentReport.contribution_plan.status),element('p','Matched reimbursement amount: not established'),element('p','Shared spending on your accounts: '+money(detailSeries(['kind','purpose']).find(series=>series.dimensions.purpose==='Household')?.period_total??0)));
 
- renderAccounts();renderCommitments();renderBudget();renderTransactions();table('coverage-table',['Account','July records','August records','September records','Source status'],data.coverage.map(a=>[a.name,...data.months.map(m=>a.months[m]),a.status]));drawChart();renderPageHeroes();
+ sourceInspector.refresh();renderAccounts();renderCommitments();renderBudget();renderTransactions();table('coverage-table',['Account','July records','August records','September records','Source status'],data.coverage.map(a=>[a.name,...data.months.map(m=>a.months[m]),a.status]));drawChart();renderPageHeroes();
 }
 function merchantTable(series,total){
  const mm=currentReport.months,target=element('div');target.className='scroll';const tb=element('table'),head=element('tr');
@@ -190,7 +193,7 @@ const queuedSave=createSaveQueue(async document=>{
  if(res.status===409)return {ok:false,reason:'Another user saved changes. Export your edits, then reload before saving again.'};
  if(!res.ok)throw Error('Shared save failed. Changes remain unsaved; export edits before closing.');
  const result=await res.json();if(!Number.isInteger(result.revision)||result.revision!==revision+1)throw Error('Save revision not confirmed. Export edits and reload before retrying.');
- confirmedDecisions=structuredClone(document);data._revision=result.revision;++transactionRequest;transactionReport=null;return {ok:true,document};
+ confirmedDecisions=structuredClone(document);data._revision=result.revision;sourceInspector.clear();++transactionRequest;transactionReport=null;return {ok:true,document};
 });
 function updateDraftRecovery(){const button=$('discard-draft');button.hidden=!hasUnsavedChanges();button.disabled=queuedSave.pending>0;}
 async function save(){const pending=queuedSave(overrides);updateDraftRecovery();const result=await pending;updateDraftRecovery();if(!result.ok){$('save-status').textContent=result.reason;return false;}const current=JSON.stringify(overrides)===JSON.stringify(result.document);$('save-status').textContent=current?'Shared edits saved '+new Date().toLocaleTimeString():'Earlier edits saved; newer draft remains pending.';return current;}
