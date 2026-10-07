@@ -1,0 +1,58 @@
+{
+  "name": "personal-finances-cookbook",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-06",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "APP_HOSTNAME": "budget.klappy.dev",
+    "ACCESS_TEAM": "klappy.cloudflareaccess.com",
+    "ACCESS_AUD": "dff85cdce51ba9e5e37106af68357e7703c6266ffa1cf35449d6493123790527"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "personal-finances-cookbook",
+      "database_id": "8dcc55a6-fd32-4eab-b0f3-6e24d0d1491e",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "env": {
+    "development": {
+      "name": "personal-finances-cookbook-dev",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "APP_HOSTNAME": "dev.budget.klappy.dev",
+        "ACCESS_TEAM": "klappy.cloudflareaccess.com",
+        "ACCESS_AUD": "4a2219ec95ff0934867d48cdb6a8e782d511023c15e27b019fb2ec0afd4723bb"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "personal-finances-cookbook-dev",
+          "database_id": "e033354f-2665-4e91-8081-43691b2f8b59",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "run_worker_first": true,
+        "html_handling": "none",
+        "not_found_handling": "none"
+      }
+    }
+  },
+  "send_metrics": false
+}

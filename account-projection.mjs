@@ -1,0 +1,10 @@
+export function accountProjection(context,scope='combined',accountType=null){
+ if(!['home','work','combined'].includes(scope)||accountType&&!['credit_card','loan','bank'].includes(accountType))throw Error('Invalid account projection scope/type');
+ const latest=new Map();for(const row of context.account_snapshots||[]){const old=latest.get(row.account);if(!old||row.as_of>old.as_of)latest.set(row.account,row);}
+ const all=[...latest.values()].filter(row=>!accountType||row.account_type===accountType),unresolved=all.filter(row=>row.purpose==='Unresolved').length;
+ const items=all.filter(row=>scope==='combined'||(scope==='work'?row.purpose==='Business':row.purpose!=='Business')).map(row=>({...structuredClone(row),complete:false,ownership_status:row.purpose==='Unresolved'?'Purpose/ownership unresolved':'Recorded attribution; not independently verified'})).sort((a,b)=>b.balance-a.balance||a.account.localeCompare(b.account));
+ const dates=[...new Set(items.map(row=>row.as_of))].sort(),types=[...new Set(items.map(row=>row.account_type))];
+ const balances_by_type=types.map(account_type=>({account_type,reported_balance_total:items.filter(row=>row.account_type===account_type).reduce((n,row)=>n+Math.round(row.balance*100),0)/100}));
+ const total=types.length===1?balances_by_type[0].reported_balance_total:null,debt=items.length?items.filter(row=>['credit_card','loan'].includes(row.account_type)).reduce((n,row)=>n+Math.max(0,Math.round(row.balance*100)),0)/100:null,assets=items.some(row=>row.account_type==='bank')?items.filter(row=>row.account_type==='bank').reduce((n,row)=>n+Math.round(row.balance*100),0)/100:null;
+ return {balances_by_type,reported_bank_balance_total:assets,items,scope,account_type:accountType,account_count:items.length,unresolved_account_count:unresolved,reported_balance_total:total,reported_debt_total:debt,oldest_as_of:dates[0]||null,newest_as_of:dates.at(-1)||null,mixed_dates:dates.length>1,complete:false,status:'Reported snapshots; source freshness, account ownership and statement balances not independently verified. Totals are independent of spending period and reimbursement visibility.'};
+}
