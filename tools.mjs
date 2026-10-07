@@ -1,5 +1,6 @@
+import {classificationSchema} from './classification-contract.mjs';
 import {VERSION} from './core.mjs';
-const string={type:'string'},integer={type:'integer'},classification={type:'object',properties:{group:string,category:string,purpose:{type:'string',enum:['Household','Personal','Business','Unresolved']}},required:['group','category','purpose'],additionalProperties:false};
+const string={type:'string'},integer={type:'integer'},classification=classificationSchema;
 export const operationDefinitions=[
  ['docs','Read capabilities, versions and limitations',{},[]],
  ['query','Read canonical transactions with bounded pagination',{record_ids:{type:'array',items:string,maxItems:5000},search:string,month:string,account:string,purpose:string,offset:integer,limit:integer,collection:{type:'string',enum:['flows','ledger','snapshot','records']},kind:string,view:{type:'string',enum:['dashboard']},scope:{type:'string',enum:['home','work','combined']},period:string,hide_reimbursed:{type:'boolean'},all:{type:'boolean'}},[]],
