@@ -21,7 +21,21 @@ export default {async fetch(request,env){
    if(url.pathname==='/api/overrides'){const revision=Number(request.headers.get('If-Match'));if(!request.headers.has('If-Match')||!Number.isInteger(revision))return response({error:'Revision required'},428);return response(await dispatch('execute',{operation:'decision_update',args:{revision,decisions:input}},call));}
    return response(await dispatch(input.name,input.args||{},call));
   }
-  // Frontend assets will be connected after the existing UI is migrated and reviewed.
+  // Always authorize before invoking the asset binding. Do not serve a SPA
+  // fallback for unknown API, source, credential or state paths.
+  if(['GET','HEAD'].includes(request.method)&&env.ASSETS&&frontendPath(url.pathname)){
+   const asset=await env.ASSETS.fetch(request);
+   const headers=new Headers(asset.headers);
+   headers.set('Cache-Control','no-store');headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','same-origin');
+   return new Response(request.method==='HEAD'?null:asset.body,{status:asset.status,headers});
+  }
   return response({error:'Not found'},404);
  }catch(error){return response({error:error.message},error.message.includes('Revision')?409:400);}
 }};
+
+function frontendPath(path){
+ if(['/','/index.html','/service-worker.js','/pwa/manifest.webmanifest','/pwa/icon-192.png','/pwa/icon-512.png','/pwa/icon-maskable-512.png','/pwa/icon-32.png','/pwa/apple-touch-icon.png','/pwa/social-card.png'].includes(path))return true;
+ // Vite emits flat generated assets. Only declared public asset types enter
+ // this namespace; private ledger data must never be an asset.
+ return /^\/assets\/[A-Za-z0-9_-]+\.(?:js|css|svg|png|webp|woff2)$/.test(path);
+}

@@ -7,3 +7,5 @@ ledger*.json
 core-state.json
 *credentials*.json
 private/
+dist/
+.wrangler/

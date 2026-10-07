@@ -1,11 +1,18 @@
 {
   "name": "finance-core-prototype",
-  "version": "0.5.1",
+  "version": "0.5.15",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "mcp": "node mcp.mjs",
-    "serve": "node http.mjs"
+    "serve": "node http.mjs",
+    "build": "vite build && node scripts/audit-public-build.mjs dist",
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "svelte": "^5.57.2",
+    "vite": "^7.3.7"
   }
 }

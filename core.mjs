@@ -1,5 +1,11 @@
+import {accountProjection} from './account-projection.mjs';
+import {validateRuntimeEvidence,planRuntimeEvidence} from './runtime-evidence.mjs';
+import {recordQuery} from './record-query.mjs';
+import {evidenceProjection} from './evidence-projection.mjs';
 import {validateDecisions} from './decisions.mjs';
 import {recordedFlows,aggregateFlows} from './flows.mjs';
+import {flowProjection} from './flow-projection.mjs';
+import {commitmentProjection} from './commitment-projection.mjs';
 import {normalizeDashboardSnapshot,dashboardSnapshot} from './snapshot.mjs';
 import {dashboardRows} from './dashboard-domain.mjs';
 import {spendingProjection} from './projection.mjs';
@@ -15,24 +21,66 @@ function classification(c){if(!c||!['group','category','purpose'].every(k=>typeo
 function validate(rows){if(!Array.isArray(rows)||!rows.length||rows.length>5000)fail('Import requires 1–500 rows');return rows.map(r=>{if(!r||!['source_id','source_line','transaction_id','account','merchant','date','source_type'].every(k=>typeof r[k]==='string'&&r[k].length>0&&r[k].length<300)||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||!Number.isFinite(r.amount)||!Number.isFinite(r.spend)||r.spend<0||!['Era','Statement','Receipt','Snapshot'].includes(r.source_type))fail('Invalid source row');return {...r,classification:classification(r.classification)};});}
 function plan(state,rows){const draft=structuredClone(state),result={new_sources:0,new_transactions:0,replays:0};for(const r of validate(rows)){const key=JSON.stringify([r.source_id,r.source_line]);if(draft.sources[key]){if(!equal(draft.sources[key],r))fail('Conflicting immutable source line');result.replays++;continue;}const t=draft.transactions[r.transaction_id];if(t){if(t.amount!==r.amount||t.date!==r.date||t.account!==r.account)fail('Canonical link conflict');}else{draft.transactions[r.transaction_id]={id:r.transaction_id,account:r.account,merchant:r.merchant,date:r.date,amount:r.amount,spend:r.spend,classification:r.classification,...(r.attributes?{attributes:structuredClone(r.attributes)}:{})};result.new_transactions++;}draft.sources[key]=r;result.new_sources++;}return{draft,result};}
 export async function operate(state,name,args={},actor=null,provider=null){
- let snapshotContext=null;
- if(args.format&&args.format!=='dashboard_snapshot')fail('Unknown import format');
+ let snapshotContext=null,runtimeEvidence=null;
+ if(args.format&&!['dashboard_snapshot','runtime_evidence'].includes(args.format))fail('Unknown import format');
+ if(['import_preview','import_commit'].includes(name)&&args.format==='runtime_evidence')runtimeEvidence=validateRuntimeEvidence(args.evidence);
+ if(runtimeEvidence&&(args.rows!==undefined||args.snapshot!==undefined))fail('Runtime evidence import cannot also include transaction rows or a snapshot');
  if(['import_preview','import_commit'].includes(name)&&args.format==='dashboard_snapshot'){const normalized=normalizeDashboardSnapshot(args.snapshot);args={...args,rows:normalized.rows};snapshotContext=normalized.context;}
  if(['import_preview','import_commit'].includes(name)&&!snapshotContext&&Array.isArray(args.rows)&&args.rows.length>500)fail('Import requires 1–500 rows');
- const importDigest=()=>hash(snapshotContext?{rows:args.rows,context:snapshotContext}:args.rows);
+ const importDigest=()=>hash(runtimeEvidence|| (snapshotContext?{rows:args.rows,context:snapshotContext}:args.rows));
  if(name==='import_commit'&&state.imports[args.idempotency_key]){if(!actor)fail('Authenticated actor required');const previous=state.imports[args.idempotency_key];if(previous.digest!==importDigest())fail('Idempotency content conflict');return previous;}
  const mutating=['import_commit','classification_propose','classification_review','decision_update'].includes(name);if(mutating){if(!actor)fail('Authenticated actor required');if(args.revision!==state.revision)fail('Revision conflict');}
+ if(runtimeEvidence){
+  const {draft,result}=planRuntimeEvidence(state,runtimeEvidence);
+  if(name==='import_preview')return {...result,source_id:runtimeEvidence.source_id,source_hash:runtimeEvidence.source_hash,payload_hash:hash(runtimeEvidence.payload),revision:state.revision};
+  if(typeof args.idempotency_key!=='string'||!args.idempotency_key||['__proto__','constructor','prototype'].includes(args.idempotency_key))fail('Invalid runtime idempotency key');
+  const receipt={...result,format:'runtime_evidence',source_id:runtimeEvidence.source_id,source_hash:runtimeEvidence.source_hash,payload_hash:hash(runtimeEvidence.payload),observed_at:runtimeEvidence.observed_at,actor,created_at:new Date().toISOString(),digest:importDigest(),revision:state.revision+1};
+  draft.dashboard_context.runtime_evidence_refs={...(draft.dashboard_context.runtime_evidence_refs||{}),[runtimeEvidence.source_id]:{source_id:runtimeEvidence.source_id,source_type:'Snapshot',source_hash:runtimeEvidence.source_hash,payload_hash:receipt.payload_hash,observed_at:runtimeEvidence.observed_at}};
+  draft.imports[args.idempotency_key]=receipt;draft.revision++;Object.assign(state,draft);return receipt;
+ }
  if(name==='docs')return {version:VERSION,capabilities:['docs','query','summarize','coverage','import_preview','import_commit','classification_propose','classification_review','export'],classification_contract:'finance-classification@1',automatic_acceptance:false,jev_configured:!!provider,limitations:['Normalized imports only','No direct Era refresh','No PDF extraction','No remote OAuth','Not integrated into cloud dashboard']};
  if(name==='decision_update'){const decisions=validateDecisions(state,args.decisions);const draft=structuredClone(state);draft.dashboard_context.overrides=decisions;
   for(const [id,decision] of Object.entries(decisions.transactions)){const record=draft.transactions[id];if(record&&!decision.splits&&!record.attributes?.splits&&['group','category','purpose'].some(k=>Object.hasOwn(decision,k)))record.classification=classification({...record.classification,...Object.fromEntries(['group','category','purpose'].filter(k=>Object.hasOwn(decision,k)).map(k=>[k,decision[k]]))});}
   const event={id:randomUUID(),actor,revision:state.revision+1,created_at:new Date().toISOString(),before:hash(state.dashboard_context.overrides),after:hash(decisions),before_decisions:structuredClone(state.dashboard_context.overrides),after_decisions:structuredClone(decisions),kind:'decision_document_updated'};draft.decision_events=[...(draft.decision_events||[]),event];draft.revision++;Object.assign(state,draft);return {revision:state.revision,event_id:event.id};}
  if(name==='export'||name==='query'&&args.collection==='ledger')return structuredClone(state);
  if(name==='query'&&args.collection==='snapshot')return dashboardSnapshot(state);
+ if(name==='query'&&args.collection==='records'){
+  if(Object.keys(args).some(key=>!['collection','scope','period','hide_reimbursed','search','account','purpose','month','offset','limit','record_ids'].includes(key)))fail('Unsupported record query option');
+  const snapshot=dashboardSnapshot(state),rows=dashboardRows(snapshot,snapshot.overrides,{scope:args.scope,period:args.period,hideReimbursed:args.hide_reimbursed}),months=args.month?[args.month]:args.period&&args.period!=='all'?[args.period]:snapshot.months;
+  const sourceIndex=new Map();for(const source of Object.values(state.sources)){const refs=sourceIndex.get(source.transaction_id)||[];refs.push({source_id:source.source_id,source_line:source.source_line,source_type:source.source_type});sourceIndex.set(source.transaction_id,refs);}
+  const evidence=rows.map(row=>({...row,source_refs:sourceIndex.get(row.parent_transaction_id||row.id)||[]}));
+  return {...recordQuery(evidence,months,args),revision:state.revision,collection:'records'};
+ }
+
+ if(name==='summarize'&&args.collection==='accounts'){
+  if(Object.keys(args).some(key=>!['collection','scope','account_type'].includes(key)))fail('Account snapshots are independent of period/reimbursement visibility');
+  const snapshot=dashboardSnapshot(state),context={...snapshot,account_snapshots:(snapshot.account_snapshots||[]).map(row=>({...row,source_refs:Object.values(state.runtime_evidence||{}).filter(source=>(source.payload.account_snapshots||[]).some(item=>item.account===row.account&&item.as_of===row.as_of)).map(source=>({source_id:source.source_id,source_type:source.source_type,source_hash:source.source_hash,observed_at:source.observed_at}))}))};
+  return {...accountProjection(context,args.scope,args.account_type),revision:state.revision,collection:'accounts'};
+ }
+ if(name==='summarize'&&args.collection==='evidence'){
+  if(Object.keys(args).some(key=>!['collection','scope','period','hide_reimbursed'].includes(key)))fail('Evidence projection accepts scope, period and reimbursement visibility only');
+  const snapshot=dashboardSnapshot(state),rows=dashboardRows(snapshot,snapshot.overrides,{scope:args.scope,period:args.period,hideReimbursed:args.hide_reimbursed}),months=args.period&&args.period!=='all'?[args.period]:snapshot.months;
+  const sourceIndex=new Map();for(const source of Object.values(state.sources)){const refs=sourceIndex.get(source.transaction_id)||[];refs.push({source_id:source.source_id,source_line:source.source_line,source_type:source.source_type});sourceIndex.set(source.transaction_id,refs);}
+  const evidence=rows.map(row=>({...row,source_refs:sourceIndex.get(row.parent_transaction_id||row.id)||[]}));
+  return {...evidenceProjection(evidence,months,snapshot.original_era_monthly_counts),revision:state.revision,collection:'evidence'};
+ }
+ if(name==='summarize'&&args.collection==='commitments'){
+  if(Object.keys(args).some(key=>!['collection','scope'].includes(key)))fail('Commitment planning accepts scope only; it uses gross snapshot evidence');
+  const snapshot=dashboardSnapshot(state),rows=dashboardRows(snapshot,snapshot.overrides,{scope:args.scope,all:true});
+  const sourceIndex=new Map();for(const source of Object.values(state.sources)){const refs=sourceIndex.get(source.transaction_id)||[];refs.push({source_id:source.source_id,source_line:source.source_line,source_type:source.source_type});sourceIndex.set(source.transaction_id,refs);}
+  const evidence=rows.map(row=>({...row,source_refs:sourceIndex.get(row.parent_transaction_id||row.id)||[]}));
+  return {...commitmentProjection(evidence,snapshot.months,snapshot.overrides.commitments,snapshot.expected_wife_contributions),revision:state.revision,collection:'commitments',scope:args.scope||'combined',evidence_period:'snapshot months; gross recorded charges'};
+ }
  if(['query','summarize'].includes(name)&&args.collection==='flows'){
    const snapshot=state.dashboard_context?dashboardSnapshot(state):{months:[...new Set(Object.values(state.transactions).map(r=>r.date.slice(0,7)))],overrides:{},transactions:Object.values(state.transactions).map(r=>({...r,...r.classification,month:r.date.slice(0,7)}))};
    const rows=dashboardRows(snapshot,snapshot.overrides,{scope:args.scope,period:args.period,hideReimbursed:args.hide_reimbursed});
-   const flows=recordedFlows(rows).filter(r=>(!args.account||r.account===args.account)&&(!args.month||r.month===args.month)&&(!args.purpose||r.purpose===args.purpose)&&(!args.kind||r.kind===args.kind));
-   if(name==='summarize')return {collection:'flows',totals:aggregateFlows(flows,args.group_by),revision:state.revision,complete:false,cash_balance_change_verified:false};
+   const rowIndex=new Map(rows.map(row=>[row.id,row])),sourceIndex=new Map();for(const source of Object.values(state.sources)){const refs=sourceIndex.get(source.transaction_id)||[];refs.push({source_id:source.source_id,source_line:source.source_line,source_type:source.source_type});sourceIndex.set(source.transaction_id,refs);}
+   const flows=recordedFlows(rows).map(flow=>{const row=rowIndex.get(flow.transaction_id);return {...flow,source_refs:sourceIndex.get(row?.parent_transaction_id||flow.transaction_id)||[],classification_authority:row?.classification_reviewed?'accepted human review':'recorded classification; not certified review'};}).filter(r=>(!args.account||r.account===args.account)&&(!args.month||r.month===args.month)&&(!args.purpose||r.purpose===args.purpose)&&(!args.kind||r.kind===args.kind)&&(!args.groups||args.groups.includes(r.group)));
+   if(name==='summarize'){
+    const months=args.month?[args.month]:args.period&&args.period!=='all'?[args.period]:snapshot.months;
+    const planning={contribution_plan:args.scope==='work'?{}:snapshot.expected_wife_contributions||{},budget_targets:snapshot.overrides?.budgets||{},expected_contribution_monthly:args.scope==='work'?0:snapshot.expected_wife_contributions?Object.values(snapshot.expected_wife_contributions).reduce((n,v)=>n+Number(v),0):null};
+    return {collection:'flows',totals:aggregateFlows(flows,args.group_by),...(args.series?{projection:flowProjection(flows,months,args.series_by||['kind','group'],planning)}:{}),...(args.rollups?{rollups:args.rollups.map(dimensions=>flowProjection(flows,months,dimensions,planning))}:{}),revision:state.revision,complete:false,cash_balance_change_verified:false};
+   }
    return {collection:'flows',items:flows.slice(Math.max(0,args.offset||0),Math.max(0,args.offset||0)+Math.min(200,Math.max(1,args.limit||100))),total:flows.length,revision:state.revision};
  }
  if(name==='query'&&args.view&&args.view!=='dashboard')fail('Unknown query view');

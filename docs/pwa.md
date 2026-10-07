@@ -1,6 +1,6 @@
 # PWA work state
 
-Design specification: personal-finances-cookbook contracts/pwa.md (draft). Assets and mobile layout are staged under the local household-finances/cloudflare bootstrap, not incorporated into this core repo or released.
+Design specification: personal-finances-cookbook contracts/pwa.md (draft). Generic branding assets, manifest and network-only service worker are now staged in this app repository. The reviewed Worker asset binding runs authentication before every asset request. The full build dry-run passes; Git-connected release and actual device installation remain unverified.
 
 Phone identity: Money cookbook / Our money. Home-screen and maskable icons use generic house/book artwork. Manifest starts at protected root. Social image contains branding only. All static routes remain behind authentication, so unauthenticated social crawlers may see the login page.
 

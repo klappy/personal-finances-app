@@ -20,3 +20,22 @@ Presentation-only: openTab, sidebar, colors, formatted labels and chart visibili
 First implementation slice: shared filter/projection contract with synthetic fixtures; read-only overview projection exposed through existing summarize dispatch, then migrate UI consumption. Preserve current cloud ledger and overrides; never replace it with stale local data. Requirements to settle in the contract: hidden paid expense treatment must explicitly distinguish spending view from received reimbursement inflow; future monthly completeness must not treat a missing account month as zero.
 
 Unperformed: deployed UI migration, exhaustive element-level audit, actual financial totals parity, remote MCP auth, production core wiring. Existing mechanics tests are independent evidence only for their tested cases.
+
+## Local migration evidence — October 7, 2026
+The table above records the original baseline. The following reflects the current development frontend, not deployed production. Every operation uses the same four-tool dispatcher; there are no page-specific HTTP endpoints.
+
+| Surface | Shared operation / projection | Evidence and remaining gap |
+|---|---|---|
+| Overview, category totals, cash hero | project/summarize/flows → flowProjection | Core-owned typed amounts, averages and funding comparison; provisional expected funding and allocations retain uncertainty |
+| Chart and category/merchant drilldowns | flows series and generic rollups | Core monthly totals/shares, source IDs and canonical parent lineage; rendered full-scope parity still pending |
+| Cash movement table | flows rollups by kind/payment_channel | Purchases and settlement remain separate; informational funding excluded; local Home rendering checked |
+| Bills, subscriptions, baseline | project/summarize/commitments → commitmentProjection | Core schedule assumptions, selections, targets and decision totals; recurrence and completeness not certified |
+| Budget comparison | flows budget_comparison | Saved targets, nullable averages and allocation-aware payroll comparison; global targets across scopes explicitly retained |
+| Contribution plan / funding summary | flows contribution_plan, measures and purpose rollups | Expected arrangement separate from classified receipts; no payment-matching certification |
+| Coverage table and heroes | project/summarize/evidence → evidenceProjection | Observed counts, receipt links, nullable original inventory and source references; line/balance reconciliation unavailable |
+| Transaction search/count/spending heroes | Legacy browser filtering and sums | NOT migrated; needs canonical shared record selection and summary |
+| Giving trail and imported coverage notes | Protected snapshot context | Retained historical narrative; typed reconciliation/provenance audit still pending |
+| Credit-card snapshots | Pending protected runtime migration | NOT migrated; development page deliberately reports pending rather than stale embedded balances |
+| Save/edit/export | decision_update and protected snapshot adapters | Revisioned append-only decision events; real browser failed-write/stale-edit journeys and cloud migration still pending |
+
+Existing 27-case private-data checks compare flows and commitments across core/HTTP/MCP at one local revision without changing state. They do not prove coverage, rendered UI, current production data preservation or all action parity. Synthetic evidence/target tests add narrow MCP parity proofs. No 100% UI parity claim is supported. Remaining release gates include protected metadata migration, full runtime smoke/decision preservation, PWA assets, Git-connected dev/prod builds and authorized remote MCP configuration.
