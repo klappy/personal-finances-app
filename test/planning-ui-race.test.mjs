@@ -1,3 +1,5 @@
+import {prepareCommitmentMoves} from '../commitment-preparation.mjs';
+import {commitmentEditorDecisionLabels} from '../commitment-contract.mjs';
 import {coreMoneyCard} from '../frontend/context-evidence.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,16 +15,16 @@ test('baseline edits after a pending move preserve billing siblings and use the 
  const element=(tag,text)=>({tag,text,style:{},children:[],append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children},setAttribute(key,value){this[key]=value;controls.push(this)}});
  const $=id=>{if(!nodes.has(id))nodes.set(id,element('div'));return nodes.get(id)};
  $('baseline-mode').value='home';$('subscription-sort').value='amount';
- const overrides={commitments:{Example:{decision:'Keep',billingFrequency:'Monthly',billingCharge:20}}};
+ const overrides={commitments:{Example:{decision:'Keep',billingFrequency:'Monthly',billingCharge:20,workEssential:false,workBaselineAmount:600.01}}};
  const item={name:'Example',assigned_scope:'home',essential:false,baseline_monthly_amount:20,recorded_average_per_selected_month:20,observed_month_count:3,evidence_month_count:3,subscription_candidate:false};
  const writes=[],pending=[];
- const context={$,element,overrides,commitmentDecision,planningReport:{items:[item],scope_totals:[{scope:'home',selected_count:0,monthly_total:0,monthly_to_cover:0,expected_contribution_offset:0,categories:[]}],subscription_decision_totals:[]},money:String,categoryColors:{},billingControl:()=>element('div'),renderPageHeroes:()=>{},render:async()=>{},save:()=>{writes.push(structuredClone(overrides));return new Promise(resolve=>pending.push(resolve))}};
+ const context={prepareCommitmentMoves,commitmentEditorDecisionLabels,$,element,overrides,commitmentDecision,planningReport:{items:[item],scope_totals:[{scope:'home',selected_count:0,monthly_total:0,monthly_to_cover:0,expected_contribution_offset:0,categories:[]}],subscription_decision_totals:[]},money:String,categoryColors:{},billingControl:()=>element('div'),renderPageHeroes:()=>{},render:async()=>{},save:()=>{writes.push(structuredClone(context.overrides));return new Promise(resolve=>pending.push(resolve))}};
  vm.runInNewContext(planning+';renderPlanning();',context);
  const unique=[...new Set(controls)],find=label=>unique.find(n=>n['aria-label']===label);
  const move=find('Example move to Work'),check=find('Example non-negotiable'),amount=find('Example baseline monthly amount');
- const moved=move.onclick();
+ const moved=move.onclick();assert.equal(writes[0].commitments.Example.workBaselineAmount,600.01);assert.equal(writes[0].commitments.Example.workEssential,false);
  // A billing edit lands while the move's save is still pending.
- overrides.commitments.Example.billingFrequency='Annual';overrides.commitments.Example.billingCharge=240;
+ context.overrides.commitments.Example.billingFrequency='Annual';context.overrides.commitments.Example.billingCharge=240;
  check.checked=true;const selected=check.onchange();amount.value=25;const changed=amount.onchange();
  const latest=writes.at(-1).commitments.Example;
  assert.equal(latest.budgetScope,'work');assert.equal(latest.workEssential,true);assert.equal(latest.workBaselineAmount,25);
@@ -48,7 +50,7 @@ import {createSourceInspector} from '../frontend/source-inspector.js';
 test('refused reload preserves the transaction report and in-flight request identity',async()=>{
  const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),loader=source.slice(source.indexOf('async function load(options={}'),source.indexOf('\ndocument.querySelectorAll',source.indexOf('async function load(options={}')));
  const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id)};
- const report={summary:{record_count:3}},draft={notes:'unsaved'},context={$,loadWithSaveGuard,queuedSave:{pending:0,activity:0},overrides:draft,hasUnsavedChanges:()=>true,updateDraftRecovery:()=>{},transactionRequest:7,transactionReport:report,fetch:async()=>{throw Error('Unexpected read')}};
+ const report={summary:{record_count:3}},draft={notes:'unsaved'},context={editorGeneration:0,editorDraftSnapshot:()=>null,$,loadWithSaveGuard,queuedSave:{pending:0,activity:0},overrides:draft,hasUnsavedChanges:()=>true,updateDraftRecovery:()=>{},transactionRequest:7,transactionReport:report,fetch:async()=>{throw Error('Unexpected read')}};
  await vm.runInNewContext(loader+';load();',context);
  assert.equal(context.transactionRequest,7);assert.equal(context.transactionReport,report);assert.equal(context.overrides,draft);assert.match($('save-status').textContent,/Unsaved edits/);
  context.hasUnsavedChanges=()=>false;context.fetch=async()=>{throw Error('offline')};await vm.runInNewContext('load();',context);assert.equal(context.transactionRequest,7);assert.equal(context.transactionReport,report);assert.match($('save-status').textContent,/offline/);
@@ -75,7 +77,13 @@ test('confirmed notes save restores the source inspector without a full dashboar
 test('applied reload invalidates editor source evidence while refused and failed reloads retain it',async()=>{
  const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),loader=source.slice(source.indexOf('async function load(options={}'),source.indexOf('\ndocument.querySelectorAll',source.indexOf('async function load(options={}')));
  const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{textContent:'',replaceChildren(){},append(){}});return nodes.get(id)};let invalidations=0;
- const snapshot={_revision:4,transactions:[],overrides:{transactions:{},budgets:{},commitments:{},notes:'saved'}},context={editorGeneration:0,$,loadWithSaveGuard,structuredClone,queuedSave:{pending:0,activity:0},data:{_revision:3},overrides:{notes:'saved'},hasUnsavedChanges:()=>true,updateDraftRecovery:()=>{},recordSourceReader:{invalidate(){invalidations++;}},transactionRequest:0,transactionReport:{},document:{querySelectorAll:()=>[]},Option:function(){},render(){},fetch:async()=>({ok:true,json:async()=>snapshot})};
+ const snapshot={_revision:4,transactions:[],overrides:{transactions:{},budgets:{},commitments:{},notes:'saved'}},context={editorGeneration:0,editorDraftSnapshot:()=>null,$,loadWithSaveGuard,structuredClone,queuedSave:{pending:0,activity:0},data:{_revision:3},overrides:{notes:'saved'},hasUnsavedChanges:()=>true,updateDraftRecovery:()=>{},recordSourceReader:{invalidate(){invalidations++;}},transactionRequest:0,transactionReport:{},document:{querySelectorAll:()=>[]},Option:function(){},render(){},fetch:async()=>({ok:true,json:async()=>snapshot})};
  await vm.runInNewContext(loader+';load();',context);assert.equal(invalidations,0);context.hasUnsavedChanges=()=>false;context.fetch=async()=>{throw Error('offline')};await vm.runInNewContext('load();',context);assert.equal(invalidations,0);
- context.fetch=async()=>({ok:true,json:async()=>snapshot});await vm.runInNewContext('load();',context);assert.equal(invalidations,1);assert.equal(context.data._revision,4);
+ context.fetch=async()=>({ok:true,json:async()=>snapshot});await vm.runInNewContext('load();',context);assert.equal(invalidations,1);assert.equal(context.data._revision,4);assert.equal($('editor').hidden,true);assert.equal(context.editorHasUnsavedChanges(),false);
+});
+test('actual reload guards raw editor edits across pending normal and discard reads',async()=>{
+ const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),loader=source.slice(source.indexOf('async function load(options={}'),source.indexOf('\ndocument.querySelectorAll',source.indexOf('async function load(options={}')));
+ for(const discardDraft of [false,true]){const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,textContent:'',replaceChildren(){},append(){}});return nodes.get(id)};let fields={category:'Flight'},finishRead,invalidations=0;const context={editorGeneration:1,editorDraftSnapshot:()=>fields,$,loadWithSaveGuard,structuredClone,queuedSave:{pending:0,activity:0},data:{_revision:3},overrides:{notes:''},hasUnsavedChanges:()=>false,updateDraftRecovery(){},recordSourceReader:{invalidate(){invalidations++;}},transactionRequest:0,transactionReport:{},document:{querySelectorAll:()=>[]},Option:function(){},render(){},fetch:()=>new Promise(resolve=>finishRead=resolve)};
+  const pending=vm.runInNewContext(loader+';load({discardDraft:'+discardDraft+'});',context);fields={category:'New choice during read'};finishRead({ok:true,json:async()=>({_revision:4,transactions:[],overrides:{transactions:{},budgets:{},commitments:{},notes:''}})});await pending;assert.equal(context.data._revision,3);assert.equal(invalidations,0);assert.equal($('editor').hidden,false);assert.match($('save-status').textContent,/Edits changed during reload/);
+ }
 });

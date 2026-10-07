@@ -1,3 +1,4 @@
+import {commitmentBillingFrequencies,commitmentDecisionLabels} from './commitment-contract.mjs';
 import {planningItems} from './dashboard-domain.mjs';
 const cents=value=>{const number=Number(value);if(!Number.isFinite(number)||number<0)throw Error('Invalid planning amount');return Math.round(number*100);};
 const money=value=>value/100;
@@ -17,7 +18,7 @@ export function commitmentProjection(rows,months,decisions={},contributions={}){
   const assigned_scope=state.budgetScope||(item.work?'work':'home');
   if(!['home','work'].includes(assigned_scope))throw Error('Invalid planning scope');
   const billing_frequency=state.billingFrequency||(item.rr.length===1?'Annual':'Monthly');
-  if(!['Unconfirmed','Monthly','Annual','One-time'].includes(billing_frequency))throw Error('Invalid billing frequency');
+  if(!commitmentBillingFrequencies.includes(billing_frequency))throw Error('Invalid billing frequency');
   const charge=cents(state.billingCharge??item.latest),monthly=billing_frequency==='Annual'?Math.round(charge/12):billing_frequency==='One-time'?0:charge;
   const amount=cents((assigned_scope==='work'?state.workBaselineAmount:state.baselineAmount)??state.target??money(monthly));
   const essential=Boolean(assigned_scope==='work'?state.workEssential:state.essential);
@@ -33,7 +34,7 @@ export function commitmentProjection(rows,months,decisions={},contributions={}){
   for(const item of selected)groups.set(item.budget_category,(groups.get(item.budget_category)||0)+cents(item.baseline_monthly_amount));
   return {scope,selected_count:selected.length,monthly_total:money(total),expected_contribution_offset:money(offset),monthly_to_cover:money(Math.max(0,total-offset)),categories:[...groups].map(([category,amount])=>({category,monthly_amount:money(amount)})).sort((a,b)=>b.monthly_amount-a.monthly_amount),status:'Saved planning decisions and editable schedule assumptions; expected deposits not matched'};
  };
- const decision_totals=['Keep','Review','Business','Consider cutting'].map(decision=>{const selected=items.filter(item=>item.subscription_candidate&&item.decision===decision);return {decision,item_count:selected.length,scheduled_monthly_amount:money(selected.reduce((n,item)=>n+cents(item.scheduled_monthly_amount),0)),observed_period_total:money(selected.reduce((n,item)=>n+cents(item.period_total),0)),status:'Planning estimate; selecting does not cancel a service'};});
+ const decision_totals=commitmentDecisionLabels.map(decision=>{const selected=items.filter(item=>item.subscription_candidate&&item.decision===decision);return {decision,item_count:selected.length,scheduled_monthly_amount:money(selected.reduce((n,item)=>n+cents(item.scheduled_monthly_amount),0)),observed_period_total:money(selected.reduce((n,item)=>n+cents(item.period_total),0)),status:'Planning estimate; selecting does not cancel a service'};});
  const candidate_totals=['all','bill','subscription'].map(candidate_type=>{const selected=items.filter(item=>candidate_type==='all'||item[candidate_type+'_candidate']);return {candidate_type,item_count:selected.length,scheduled_monthly_amount:money(selected.reduce((n,item)=>n+cents(item.scheduled_monthly_amount),0)),observed_period_total:money(selected.reduce((n,item)=>n+cents(item.period_total),0)),planned_monthly_target:money(selected.reduce((n,item)=>n+cents(item.planned_monthly_target??0),0)),consider_cutting_recorded_average:money(selected.filter(item=>item.decision==='Consider cutting').reduce((n,item)=>n+cents(item.recorded_average_per_selected_month),0))};});
  return {items,months,candidate_totals,scope_totals:['home','work','combined'].map(summarize),subscription_decision_totals:decision_totals,complete:false};
 }
