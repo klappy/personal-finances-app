@@ -17,3 +17,13 @@ test('merchant aliases and planning quantities use shared helpers',()=>{
  const work=fixture('work',{purpose:'Business'});assert.deepEqual(scopeRows([water,work],'home'),[water]);assert.deepEqual(scopeRows([water,work],'work'),[work]);
  const plan=planningItems([fixture('g')],['2026-07','2026-08','2026-09']);assert.equal(plan[0].avg,100/3);assert.equal(plan[0].observedMonths,1);assert.equal(plan[0].latest,100);
 });
+test('split conservation prevents invented expense and inherited payroll',()=>{
+ const data={months:['2026-09'],transactions:[fixture('parent',{payroll:100})]},overrides={transactions:{parent:{splits:[{id:'a',spend:60},{id:'b',spend:40}]}}};
+ assert.throws(()=>dashboardRows(data,overrides),/conservation conflict: payroll/);
+ overrides.transactions.parent.splits=[{id:'a',spend:60,payroll:60},{id:'b',spend:40,payroll:40}];assert.equal(sum(dashboardRows(data,overrides),'payroll'),100);
+ overrides.transactions.parent.splits[1].spend=90;assert.throws(()=>dashboardRows(data,overrides),/conservation conflict: spend/);
+});
+test('explicit travel purpose precedes scope; reimbursement eligibility does not infer purpose',()=>{
+ const data={months:['2026-09'],transactions:[fixture('work',{group:'Travel',purpose:'Personal',travel_purpose:'Work'}),fixture('eligible',{group:'Travel',purpose:'Personal',reimbursement_status:'Eligible'})]};
+ assert.deepEqual(dashboardRows(data,{}, {scope:'work'}).map(r=>r.id),['work']);assert.deepEqual(dashboardRows(data,{}, {scope:'home'}).map(r=>r.id),['eligible']);
+});

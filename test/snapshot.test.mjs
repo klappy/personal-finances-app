@@ -12,3 +12,11 @@ test('snapshot cannot overwrite initialized destination and invalid duplicate ID
  const s=empty(),snapshot=fixture();snapshot.transactions.push({...snapshot.transactions[0]});await assert.rejects(operate(s,'import_commit',{format:'dashboard_snapshot',snapshot,revision:0,idempotency_key:'bad'},'fixture'),/unique/);assert.equal(s.revision,0);
  const valid=fixture();await operate(s,'import_commit',{format:'dashboard_snapshot',snapshot:valid,revision:0,idempotency_key:'first'},'fixture');await assert.rejects(operate(s,'import_commit',{format:'dashboard_snapshot',snapshot:valid,revision:1,idempotency_key:'other'},'fixture'),/empty destination/);
 });
+test('accepted review outranks legacy overlay and original evidence remains preserved',async()=>{
+ const snapshot=fixture();snapshot.overrides.transactions.one={group:'Legacy',category:'Old',purpose:'Business',travel_purpose:'Work'};const s=empty();await operate(s,'import_commit',{format:'dashboard_snapshot',snapshot,revision:0,idempotency_key:'seed'},'fixture');
+ const proposal=await operate(s,'classification_propose',{transaction_id:'one',revision:1},'fixture');await operate(s,'classification_review',{proposal_id:proposal.id,revision:2,decision:'accept',classification:{group:'Travel',category:'New',purpose:'Personal'},evidence:'Synthetic human review'},'fixture');
+ const view=await operate(s,'query',{view:'dashboard',scope:'home'});assert.equal(view.transactions[0].category,'New');assert.equal(view.transactions[0].purpose,'Personal');assert.equal(s.dashboard_context.overrides.transactions.one.category,'Old');assert.equal(Object.values(s.sources)[0].attributes.category,'Unknown');
+});
+test('split parents cannot receive misleading whole-parent classification review',async()=>{
+ const s=empty();await operate(s,'import_commit',{format:'dashboard_snapshot',snapshot:fixture(),revision:0,idempotency_key:'seed'},'fixture');await assert.rejects(operate(s,'classification_propose',{transaction_id:'one',revision:1},'fixture'),/individual review/);assert.equal(s.revision,1);
+});

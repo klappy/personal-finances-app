@@ -23,3 +23,5 @@ Same input revision/options yields the same payload regardless of transport. Sou
 
 ## Validation order
 Prove pure transforms on valid/missing/conflicting cases, conservation and uncertainty; then actual HTTP/MCP payload parity; then rendered UI conformance and persona usability. Cross-layer audit maps each UI financial element to a composed capability and source chain. An identical helper alone does not prove full application parity.
+
+Review corrections: split allocations conserve every additive measure in integer cents; no value is inherited into multiple children. A missing allocation for a nonzero parent measure is a conflict. Explicit Work travel purpose is applied before scope selection; reimbursement eligibility alone never assigns business purpose. Accepted reviews outrank historical category/purpose overlays and travel inference while preserving history. Parent records with splits reject whole-parent classification proposals; individual allocation review remains an explicit implementation gap.

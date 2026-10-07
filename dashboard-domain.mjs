@@ -5,11 +5,24 @@ export function scopeRows(rows, scope='combined', commitments={}) {
  if(!['home','work','combined'].includes(scope))throw Error('Invalid scope');
  return rows.filter(r=>{const assigned=commitments[billName(r)]?.budgetScope;const work=assigned?assigned==='work':r.purpose==='Business'||r.work_receipt>0||r.inflow_role==='Mixed business income / reimbursement';return scope==='combined'||(scope==='work'?work:!work)});
 }
+export const additiveMeasures=['spend','payroll','work_receipt','bank_card_repayment','refund','review_credit','business_payroll_estimate','reimbursement_estimate'];
+export function expandAllocations(parent, decisions={}) {
+ if(!parent.splits)return [parent];
+ if(!Array.isArray(parent.splits)||!parent.splits.length)throw Error('Invalid split allocations');
+ const ids=new Set();
+ const children=parent.splits.map(part=>{if(typeof part.id!=='string'||part.id===parent.id||ids.has(part.id))throw Error('Split requires unique child identities');ids.add(part.id);const child={...parent,...part,splits:undefined,...(decisions[part.id]||{})};
+  for(const field of additiveMeasures){const value=(decisions[part.id]?.[field]??part[field]??0);if(!Number.isFinite(value)||value<0)throw Error('Invalid split measure: '+field);child[field]=value;}
+  return child;
+ });
+ for(const field of additiveMeasures){const value=parent[field]??0;if(!Number.isFinite(value)||value<0)throw Error('Invalid parent measure: '+field);const total=children.reduce((n,r)=>n+Math.round(r[field]*100),0);if(total!==Math.round(value*100))throw Error('Split conservation conflict: '+field);}
+ return children;
+}
 export function dashboardRows(data, overrides={}, options={}) {
  const scope=options.scope||'combined', period=options.period||'all', months=data.months||[];
- let rows=data.transactions.flatMap(r=>{const parent={...r,...(overrides.transactions?.[r.id]||{})};return parent.splits?parent.splits.map(part=>({...parent,...part,splits:undefined,...(overrides.transactions?.[part.id]||{})})): [parent]});
+ let rows=data.transactions.flatMap(r=>{const parent={...r,...(overrides.transactions?.[r.id]||{})};return expandAllocations(parent,overrides.transactions||{})});
+ rows=rows.map(r=>!r.classification_reviewed&&r.group==='Travel'&&r.travel_purpose==='Work'?{...r,purpose:'Business'}:r);
  rows=scopeRows(rows,scope,overrides.commitments||{});
- return rows.map(r=>(r.group==='Travel'&&(r.travel_purpose==='Work'||['Paid','Submitted','Draft','Eligible','Reimbursable'].includes(r.reimbursement_status)))?{...r,purpose:'Business',travel_purpose:'Work'}:r)
+ return rows
  .map(r=>r.purpose==='Business'?{...r,original_group:r.group,group:'Business',category:r.group==='AI'?'AI · '+r.category:r.group==='Travel'?'Work travel · '+r.category:r.category}:r)
  .map(r=>{if(scope==='work'&&r.group==='Business'){const text=(r.merchant+' '+r.description+' '+r.category).toLowerCase();return {...r,group:r.original_group==='AI'||/anthropic|cursor|open\s*ai|claude|fyxer|elevenlabs|lovable|grok|replicate/.test(text)?'AI':r.original_group==='Travel'?'Travel':/cloudflare|github|twilio|hosting|domain/.test(text)?'Infrastructure':'Other work'}}return r})
  .map(r=>options.hideReimbursed&&r.reimbursement_status==='Paid'?{...r,spend:Math.max(0,r.spend-(r.reimbursement_amount||0))}:r)
