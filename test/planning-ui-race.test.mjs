@@ -28,3 +28,15 @@ test('baseline edits after a pending move preserve billing siblings and use the 
  assert.equal(latest.billingFrequency,'Annual');assert.equal(latest.billingCharge,240);assert.equal(latest.decision,'Keep');
  pending.forEach(resolve=>resolve(false));await Promise.all([moved,selected,changed]);
 });
+
+test('failed projection refresh clears category amount headings and dependent reports',async()=>{
+ const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8');
+ const renderer=source.slice(source.indexOf('async function render(){'),source.indexOf('let visibleGroups='));
+ const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{value:'all',checked:false,textContent:'old amount',replaceChildren(){this.textContent=''}});return nodes.get(id)};
+ $('category-title').textContent='Example · $123.00';
+ const context={$,localStorage:{getItem:()=>null},fetch:async()=>{throw Error('offline')},transactionRequest:0,transactionReport:{old:true},projectionRequest:0,currentReport:{old:true},allReport:{old:true},chartReport:{old:true},planningReport:{old:true},evidenceReport:{old:true},accountReport:{old:true},detailReports:[{}],cashReports:[{}],visibleGroups:new Set(),detailDimensions:[],data:{_revision:2}};
+ await vm.runInNewContext(renderer+';render();',context);
+ assert.equal($('category-title').textContent,'');assert.equal($('cash-table').textContent,'');assert.equal($('baseline-table').textContent,'');assert.equal($('card-snapshot-summary').textContent,'');
+ assert.equal(context.currentReport,null);assert.equal(context.accountReport,null);assert.equal(context.planningReport,null);assert.equal(context.transactionReport,null);
+ assert.equal($('more').hidden,true);assert.match($('save-status').textContent,/offline/);
+});
