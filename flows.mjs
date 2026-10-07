@@ -10,7 +10,9 @@ const measures = [
 export function recordedFlows(rows) {
  return rows.flatMap(r=>{
  const mixed=r.inflow_role==='Mixed business income / reimbursement';
- const estimated=mixed?[['business_payroll_estimate','estimated_payroll_allocation','incoming','received'],['reimbursement_estimate','estimated_reimbursement_allocation','incoming','received']]:[];
+ const numericAllocation=mixed&&Number.isFinite(r.business_payroll_estimate)&&Number.isFinite(r.reimbursement_estimate);
+ const estimated=numericAllocation?[['business_payroll_estimate','estimated_payroll_allocation','incoming','received'],['reimbursement_estimate','estimated_reimbursement_allocation','incoming','received']]:[];
+ if(mixed&&!numericAllocation){const value=Math.abs(r.amount);if(!Number.isFinite(value))throw Error('Mixed inflow amount missing');return [{id:r.id+':mixed_inflow',transaction_id:r.id,month:r.month||r.date.slice(0,7),account:r.account,purpose:r.purpose,group:r.group,category:r.category,kind:'mixed_business_inflow',direction:'incoming',family:'review',amount:Math.round(value*100)/100,currency:'USD',source_field:'amount',source:r.source||null,evidence:r.evidence||null,certainty:'received amount recorded; allocation annotations are not numeric evidence'}];}
  return [...measures.filter(([field])=>!mixed||!['work_receipt','review_credit'].includes(field)),...estimated].flatMap(([field,kind,direction,family])=>{
   const value=r[field]??0;if(!Number.isFinite(value)||value<0)throw Error('Invalid recorded measure: '+field);
   return value ? [{id:r.id+':'+field,transaction_id:r.id,month:r.month||r.date.slice(0,7),account:r.account,purpose:r.purpose,group:r.group,category:r.category,kind,direction,family,amount:Math.round(value*100)/100,currency:'USD',source_field:field,source:r.source||null,evidence:r.evidence||null,certainty:field.endsWith('_estimate')?'estimated allocation; received payment matching not certified':family==='review'?'unresolved':'recorded; reconciliation not certified'}] : [];

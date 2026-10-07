@@ -25,6 +25,7 @@ export function dashboardRows(data, overrides={}, options={}) {
  return rows
  .map(r=>r.purpose==='Business'?{...r,original_group:r.group,group:'Business',category:r.group==='AI'?'AI · '+r.category:r.group==='Travel'?'Work travel · '+r.category:r.category}:r)
  .map(r=>{if(scope==='work'&&r.group==='Business'){const text=(r.merchant+' '+r.description+' '+r.category).toLowerCase();return {...r,group:r.original_group==='AI'||/anthropic|cursor|open\s*ai|claude|fyxer|elevenlabs|lovable|grok|replicate/.test(text)?'AI':r.original_group==='Travel'?'Travel':/cloudflare|github|twilio|hosting|domain/.test(text)?'Infrastructure':'Other work'}}return r})
+ .map(r=>{if(r.reimbursement_amount!==undefined&&(!Number.isFinite(r.reimbursement_amount)||r.reimbursement_amount<0))throw Error('Invalid reimbursement amount');return r;})
  .map(r=>options.hideReimbursed&&r.reimbursement_status==='Paid'?{...r,spend:Math.max(0,r.spend-(r.reimbursement_amount||0))}:r)
  .filter(r=>options.all||period==='all'?months.includes(r.month):r.month===period);
 }

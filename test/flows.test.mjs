@@ -13,3 +13,7 @@ test('mixed deposit allocations remain explicitly estimated and are not counted 
  const flows=recordedFlows([{id:'mixed',date:'2026-09-01',spend:0,review_credit:300,work_receipt:300,inflow_role:'Mixed business income / reimbursement',business_payroll_estimate:200,reimbursement_estimate:100}]);
  assert.equal(flows.length,2);assert.equal(flows.reduce((n,r)=>n+r.amount,0),300);assert.ok(flows.every(r=>r.certainty.startsWith('estimated')));
 });
+
+test('legacy textual mixed-income annotations remain an unresolved allocation, not fabricated numeric measures',()=>{
+ const flows=recordedFlows([{id:'mixed',date:'2026-09-01',amount:300,spend:0,inflow_role:'Mixed business income / reimbursement',business_payroll_estimate:'Approximately $200',reimbursement_estimate:'Just over $100'}]);assert.equal(flows.length,1);assert.equal(flows[0].kind,'mixed_business_inflow');assert.equal(flows[0].amount,300);assert.equal(flows[0].family,'review');
+});
