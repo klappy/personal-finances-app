@@ -20,3 +20,7 @@ test('accepted review outranks legacy overlay and original evidence remains pres
 test('split parents cannot receive misleading whole-parent classification review',async()=>{
  const s=empty();await operate(s,'import_commit',{format:'dashboard_snapshot',snapshot:fixture(),revision:0,idempotency_key:'seed'},'fixture');await assert.rejects(operate(s,'classification_propose',{transaction_id:'one',revision:1},'fixture'),/individual review/);assert.equal(s.revision,1);
 });
+
+test('empty legacy overrides stay readable after accepted review',async()=>{
+ const snapshot=fixture();snapshot.overrides={};const s=empty();await operate(s,'import_commit',{format:'dashboard_snapshot',snapshot,revision:0,idempotency_key:'empty'},'fixture');const p=await operate(s,'classification_propose',{transaction_id:'one',revision:1},'fixture');await operate(s,'classification_review',{proposal_id:p.id,revision:2,decision:'accept',classification:{group:'Food',category:'Groceries',purpose:'Personal'},evidence:'Fixture review'},'fixture');assert.equal((await operate(s,'query',{view:'dashboard',scope:'home'})).transactions[0].category,'Groceries');assert.equal((await operate(s,'summarize',{collection:'flows',scope:'home'})).totals[0].amount,100);
+});
