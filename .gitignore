@@ -1,0 +1,9 @@
+node_modules/
+*.lock
+*.tmp
+.env*
+state*.json
+ledger*.json
+core-state.json
+*credentials*.json
+private/
