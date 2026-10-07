@@ -193,7 +193,7 @@ const queuedSave=createSaveQueue(async document=>{
  if(res.status===409)return {ok:false,reason:'Another user saved changes. Export your edits, then reload before saving again.'};
  if(!res.ok)throw Error('Shared save failed. Changes remain unsaved; export edits before closing.');
  const result=await res.json();if(!Number.isInteger(result.revision)||result.revision!==revision+1)throw Error('Save revision not confirmed. Export edits and reload before retrying.');
- confirmedDecisions=structuredClone(document);data._revision=result.revision;sourceInspector.clear();++transactionRequest;transactionReport=null;return {ok:true,document};
+ confirmedDecisions=structuredClone(document);data._revision=result.revision;sourceInspector.clear();sourceInspector.refresh();++transactionRequest;transactionReport=null;return {ok:true,document};
 });
 function updateDraftRecovery(){const button=$('discard-draft');button.hidden=!hasUnsavedChanges();button.disabled=queuedSave.pending>0;}
 async function save(){const pending=queuedSave(overrides);updateDraftRecovery();const result=await pending;updateDraftRecovery();if(!result.ok){$('save-status').textContent=result.reason;return false;}const current=JSON.stringify(overrides)===JSON.stringify(result.document);$('save-status').textContent=current?'Shared edits saved '+new Date().toLocaleTimeString():'Earlier edits saved; newer draft remains pending.';return current;}
