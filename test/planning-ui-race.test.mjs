@@ -50,3 +50,12 @@ test('refused reload preserves the transaction report and in-flight request iden
  assert.equal(context.transactionRequest,7);assert.equal(context.transactionReport,report);assert.equal(context.overrides,draft);assert.match($('save-status').textContent,/Unsaved edits/);
  context.hasUnsavedChanges=()=>false;context.fetch=async()=>{throw Error('offline')};await vm.runInNewContext('load();',context);assert.equal(context.transactionRequest,7);assert.equal(context.transactionReport,report);assert.match($('save-status').textContent,/offline/);
 });
+
+test('cash hero uses core evidence status and avoids a spendable-balance or financing-source conclusion',()=>{
+ const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),renderer=source.slice(source.indexOf('function renderPageHeroes(){'),source.indexOf('function openTab(')),nodes=new Map();
+ const element=(tag,text)=>({tag,text,style:{},className:'',children:[],append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children}}),$=id=>{if(!nodes.has(id))nodes.set(id,element('div'));return nodes.get(id)};
+ $('period').value='2026-06';const metric=n=>({period_total:n,recorded_average_per_selected_month:n}),report={measures:{payroll_received:metric(0),reimbursement_received:metric(0),spending_commitment:metric(10),unallocated_received:metric(0),expected_contribution:metric(0),incoming_with_expected_funding:metric(0),funding_less_spending:metric(-10)},funding_comparison:{monthly_recorded_difference:null,missing_income_evidence_months:['2026-06']}};
+ const context={$,element,currentReport:report,rows:()=>[],data:{months:['2026-06']},reportMeasure:key=>report.measures[key].period_total,planningItems:()=>[],money:String,activeTab:'cash',localStorage:{getItem:()=>null}};
+ const text=node=>[node.text||'',...node.children.map(text)].join(' ');vm.runInNewContext(renderer+';renderPageHeroes();',context);let rendered=text($('page-heroes'));assert.match(rendered,/INCOME EVIDENCE INCOMPLETE/);assert.match(rendered,/Not established/);assert.doesNotMatch(rendered,/MONTHLY SPENDING GAP|MONTHLY INCOME REMAINING|Credit cards or savings may/);
+ report.funding_comparison={monthly_recorded_difference:90,missing_income_evidence_months:[]};report.measures.funding_less_spending=metric(90);vm.runInNewContext('renderPageHeroes();',context);rendered=text($('page-heroes'));assert.match(rendered,/RECORDED FUNDING COMPARISON/);assert.match(rendered,/not a spendable balance/);assert.doesNotMatch(rendered,/MONTHLY INCOME REMAINING/);
+});

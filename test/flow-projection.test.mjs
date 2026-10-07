@@ -47,3 +47,13 @@ test('monthly chart totals preserve missing observations and separate measure ki
 });
 
 test('contribution arrangements remain planning evidence separate from received funding',()=>{const result=flowProjection([],['2026-07'],['kind'],{contribution_plan:{Mortgage:100},expected_contribution_monthly:100});assert.equal(result.contribution_plan.items[0].monthly_amount,100);assert.equal(result.contribution_plan.monthly_total,100);assert.equal(result.measures.wife_funding_received.period_total,0);assert.match(result.contribution_plan.status,/do not certify/);});
+
+test('expected funding cannot establish a comparison when a selected month lacks income evidence',()=>{
+ const report=flowProjection([{kind:'spending_commitment',month:'2026-06',amount:10,transaction_id:'fixture'}],['2026-06'],['kind','group'],{expected_contribution_monthly:100});
+ assert.equal(report.measures.funding_less_spending.period_total,90);assert.equal(report.funding_comparison.monthly_recorded_difference,null);assert.deepEqual(report.funding_comparison.missing_income_evidence_months,['2026-06']);assert.equal(report.funding_comparison.spendable_balance_verified,false);
+ const recorded=flowProjection([{kind:'payroll_received',month:'2026-07',amount:100,transaction_id:'pay'},{kind:'spending_commitment',month:'2026-07',amount:10,transaction_id:'purchase'}],['2026-07']);assert.equal(recorded.funding_comparison.monthly_recorded_difference,90);assert.equal(recorded.funding_comparison.cash_flow_verified,false);
+});
+
+test('estimated allocations remain visible but cannot establish observed income',()=>{
+ const report=flowProjection([{kind:'estimated_payroll_allocation',month:'2026-06',amount:200,transaction_id:'estimate'},{kind:'spending_commitment',month:'2026-06',amount:10,transaction_id:'purchase'}],['2026-06'],['kind','group'],{expected_contribution_monthly:100});assert.equal(report.measures.funding_less_spending.period_total,290);assert.deepEqual(report.funding_comparison.income_observed_months,[]);assert.deepEqual(report.funding_comparison.estimated_income_only_months,['2026-06']);assert.equal(report.funding_comparison.monthly_recorded_difference,null);
+});
