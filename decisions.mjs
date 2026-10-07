@@ -24,7 +24,7 @@ export function validateDecisions(state,input) {
     if((!Number.isFinite(value)&&!(value===baseline[field]&&typeof value==='string'))||Number(value)<0)throw Error('Invalid financial decision');
     if(!child&&value!==(baseline[field]??0))throw Error('Economic measure changes require an explicit fact adjustment');
    }
-   if(field==='reimbursement_amount'&&(!Number.isFinite(value)||value<0))throw Error('Invalid reimbursement amount');
+   if(field==='reimbursement_amount'&&value!==null&&(!Number.isFinite(value)||value<0))throw Error('Invalid reimbursement amount');
    if(field==='reimbursement_status'&&!statuses.includes(value))throw Error('Invalid reimbursement state');
    if(field==='splits'){
     if(child||!Array.isArray(value)||!value.length)throw Error('Invalid split decision');

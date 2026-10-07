@@ -13,20 +13,25 @@ export function expandAllocations(parent, decisions={}) {
  const ids=new Set();
  const children=parent.splits.map(part=>{if(typeof part.id!=='string'||part.id===parent.id||ids.has(part.id))throw Error('Split requires unique child identities');ids.add(part.id);const child={...parent,...part,splits:undefined,...(decisions[part.id]||{}),parent_transaction_id:parent.id};
   for(const field of additiveMeasures){const value=(decisions[part.id]?.[field]??part[field]??0);if(!Number.isFinite(value)||value<0)throw Error('Invalid split measure: '+field);child[field]=value;}
+  const decision=decisions[part.id]||{};child.reimbursement_amount=Object.hasOwn(decision,'reimbursement_amount')?decision.reimbursement_amount:Object.hasOwn(part,'reimbursement_amount')?part.reimbursement_amount:null;
+  if(child.reimbursement_amount!==null&&(!Number.isFinite(child.reimbursement_amount)||child.reimbursement_amount<0))throw Error('Invalid split reimbursement amount');
   return child;
  });
  for(const field of additiveMeasures){const value=parent[field]??0;if(!Number.isFinite(value)||value<0)throw Error('Invalid parent measure: '+field);const total=children.reduce((n,r)=>n+Math.round(r[field]*100),0);if(total!==Math.round(value*100))throw Error('Split conservation conflict: '+field);}
+ if(parent.reimbursement_amount!=null){if(!Number.isFinite(parent.reimbursement_amount)||parent.reimbursement_amount<0)throw Error('Invalid parent reimbursement amount');const allocated=children.reduce((n,row)=>n+Math.round((row.reimbursement_amount??0)*100),0);if(allocated!==Math.round(parent.reimbursement_amount*100))throw Error('Split reimbursement conservation conflict');}
  return children;
 }
 export function dashboardRows(data, overrides={}, options={}) {
  const scope=options.scope||'combined', period=options.period||'all', months=data.months||[];
+ const original=new Map(data.transactions.map(row=>[row.id,row]));
+ const hasSavedPurpose=row=>Object.hasOwn(overrides.transactions?.[row.id]||{},'purpose')||row.parent_transaction_id&&(Object.hasOwn(overrides.transactions?.[row.parent_transaction_id]||{},'purpose')||Object.hasOwn((overrides.transactions?.[row.parent_transaction_id]?.splits||original.get(row.parent_transaction_id)?.splits||[]).find(part=>part.id===row.id)||{},'purpose'));
  let rows=data.transactions.flatMap(r=>{const parent={...r,...(overrides.transactions?.[r.id]||{})};return expandAllocations(parent,overrides.transactions||{})});
- rows=rows.map(r=>!r.classification_reviewed&&!Object.hasOwn(overrides.transactions?.[r.id]||{},'purpose')&&r.group==='Travel'&&r.travel_purpose==='Work'?{...r,purpose:'Business'}:r);
+ rows=rows.map(r=>!r.classification_reviewed&&!hasSavedPurpose(r)&&r.group==='Travel'&&r.travel_purpose==='Work'?{...r,purpose:'Business'}:r);
  rows=scopeRows(rows,scope,overrides.commitments||{});
  return rows
  .map(r=>r.purpose==='Business'?{...r,original_group:r.group,group:'Business',category:r.group==='AI'?'AI · '+r.category:r.group==='Travel'?'Work travel · '+r.category:r.category}:r)
  .map(r=>{if(scope==='work'&&r.group==='Business'){const text=(r.merchant+' '+r.description+' '+r.category).toLowerCase();return {...r,group:r.original_group==='AI'||/anthropic|cursor|open\s*ai|claude|fyxer|elevenlabs|lovable|grok|replicate/.test(text)?'AI':r.original_group==='Travel'?'Travel':/cloudflare|github|twilio|hosting|domain/.test(text)?'Infrastructure':'Other work'}}return r})
- .map(r=>{if(r.reimbursement_amount!==undefined&&(!Number.isFinite(r.reimbursement_amount)||r.reimbursement_amount<0))throw Error('Invalid reimbursement amount');return r;})
+ .map(r=>{if(r.reimbursement_amount!=null&&(!Number.isFinite(r.reimbursement_amount)||r.reimbursement_amount<0))throw Error('Invalid reimbursement amount');return r;})
  .map(r=>options.hideReimbursed&&r.reimbursement_status==='Paid'?{...r,spend:Math.max(0,r.spend-(r.reimbursement_amount||0))}:r)
  .filter(r=>options.all||period==='all'?months.includes(r.month):r.month===period);
 }

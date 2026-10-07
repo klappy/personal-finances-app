@@ -33,9 +33,9 @@ The table above records the original baseline. The following reflects the curren
 | Budget comparison | flows budget_comparison | Saved targets, nullable averages and allocation-aware payroll comparison; global targets across scopes explicitly retained |
 | Contribution plan / funding summary | flows contribution_plan, measures and purpose rollups | Expected arrangement separate from classified receipts; no payment-matching certification |
 | Coverage table and heroes | project/summarize/evidence → evidenceProjection | Observed counts, receipt links, nullable original inventory and source references; line/balance reconciliation unavailable |
-| Transaction search/count/spending heroes | Legacy browser filtering and sums | NOT migrated; needs canonical shared record selection and summary |
+| Transaction search/count/spending heroes | query/records → recordQuery | Shared filters, bounded pagination, full-match summaries and source references; local search/multi-page read verified, race/mutation journeys pending |
 | Giving trail and imported coverage notes | Protected snapshot context | Retained historical narrative; typed reconciliation/provenance audit still pending |
-| Credit-card snapshots | Pending protected runtime migration | NOT migrated; development page deliberately reports pending rather than stale embedded balances |
+| Credit-card snapshots | project/summarize/accounts → accountProjection | Typed runtime import and latest dated snapshot/source projection; local core/HTTP and rendering verified, production preservation/release still pending |
 | Save/edit/export | decision_update and protected snapshot adapters | Revisioned append-only decision events; real browser failed-write/stale-edit journeys and cloud migration still pending |
 
 Existing 27-case private-data checks compare flows and commitments across core/HTTP/MCP at one local revision without changing state. They do not prove coverage, rendered UI, current production data preservation or all action parity. Synthetic evidence/target tests add narrow MCP parity proofs. No 100% UI parity claim is supported. Remaining release gates include protected metadata migration, full runtime smoke/decision preservation, PWA assets, Git-connected dev/prod builds and authorized remote MCP configuration.
