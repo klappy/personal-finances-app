@@ -1,10 +1,17 @@
+import {contextFieldText,coreMoneyCard} from './context-evidence.js';
 import {recordSourceNode,createRecordSourceReader} from './record-source.js';
 import {createSourceInspector} from './source-inspector.js';
 import {createSaveQueue,loadWithSaveGuard} from './save-queue.js';
 import {commitmentDecision} from '../commitment-projection.mjs';
 import {classificationGroups,sum,purchasePlace,billName,scopeRows,dashboardRows,planningItems as sharedPlanningItems} from "../dashboard-domain.mjs";
 export function startDashboard(){
-function referenceNote(key){return data.reference_notes?.[key]||"Reference evidence awaiting runtime migration";}
+function referenceNote(key){return contextFieldText(data,['reference_notes',key]);}
+function refreshContextDisplay(){
+ $('source-status').textContent=contextFieldText(data,['source_status'])+' · '+contextFieldText(data,['as_of'])+' · Select Transactions to curate classifications.';
+ const historicalMonths=data.context_evidence?.months||[];table('coverage-table',['Account',...historicalMonths.map(m=>m+' records'),'Source status'],(Array.isArray(data.coverage)?data.coverage:[]).map((a,index)=>[contextFieldText(data,['coverage',index,'name']),...historicalMonths.map(m=>contextFieldText(data,['coverage',index,'months',m])),contextFieldText(data,['coverage',index,'status'])]));
+ globalThis.document.querySelectorAll('[data-reference-note]').forEach(e=>e.textContent=referenceNote(e.dataset.referenceNote));
+}
+
 
 
 
@@ -60,7 +67,7 @@ function renderSourceCoverage(){table('source-reconciliation',['Source / evidenc
 function renderPageHeroes(){
  if(!$('page-heroes')||!currentReport)return;
  const rr=rows(),sp=rr.filter(r=>r.scope==='Household'&&r.spend>0),months=$('period').value==='all'?data.months.length:1,total=reportMeasure('spending_commitment'),mixed=reportMeasure('unallocated_received'),pay=reportMeasure('payroll_received'),reimb=reportMeasure('reimbursement_received'),items=planningItems();
- const moneyCard=(label,value,note='Recorded selected-period spending')=>{const metric=typeof value==='object'?value:{period_total:value,recorded_average_per_selected_month:value/months};return [label,money(metric.recorded_average_per_selected_month)+'/mo',money(metric.period_total)+' period total · '+(metric.estimated_component>0?metric.status:note)]};
+ const moneyCard=(label,metric,note='Recorded selected-period spending')=>coreMoneyCard(label,metric,note,money);
  let stats=[];
  if(activeTab==='overview'||activeTab==='cash'){stats=[moneyCard('💵 Payroll',currentReport.measures.payroll_received,mixed?'Mixed deposits require allocation review':'Recorded payroll'),moneyCard('↩️ Reimbursements received',currentReport.measures.reimbursement_received,'Received inflow'),moneyCard('🧾 Purchases and bills',currentReport.measures.spending_commitment,'Card repayments excluded')];}
  else if(activeTab==='categories'){const ranked=currentReport.series.filter(series=>series.dimensions.kind==='spending_commitment').sort((a,b)=>(b.average_recorded_monthly_share_percent||0)-(a.average_recorded_monthly_share_percent||0));stats=[moneyCard('All categories',currentReport.measures.spending_commitment),...ranked.slice(0,3).map(series=>moneyCard(series.dimensions.group,series,(series.average_recorded_monthly_share_percent||0).toFixed(1)+'% recorded monthly share'))];}
@@ -87,7 +94,7 @@ function averageShare(group){return (reportSeries(allReport,group)?.average_reco
 function renderContent(){$('show-tata-funding').onchange=render;renderPlanning();
  groups.sort((a,b)=>averageShare(b)-averageShare(a));
  const rr=householdRows(),sp=spending(),gross=reportMeasure('spending_commitment'),salary=reportMeasure('payroll_received'),work=reportMeasure('reimbursement_received');
- $('source-status').textContent=data.source_status+' · '+data.as_of+' · Select Transactions to curate classifications.';
+ refreshContextDisplay();
 
  $('kpis').replaceChildren();$('outflow-kpis').replaceChildren();[['Payroll received',salary,referenceNote("reference_6")],['Purchases and bills',gross,'Gross spending · includes reimbursable work'],['Reimbursements received',work,referenceNote("reference_7")]].forEach(([label,n,note])=>{const p=element('div');p.className='panel';p.append(element('div',label));const measureKey=label==='Payroll received'?'payroll_received':label==='Reimbursements received'?'reimbursement_received':'spending_commitment';const v=element('div',money(currentReport.measures[measureKey].recorded_average_per_selected_month));v.className='metric';p.append(v);const avg=element('div','Monthly average');avg.className='small';p.append(avg);const total=element('div',money(n)+' selected-period total');total.className='small muted';p.append(total);const measure=label==='Payroll received'?currentReport.measures.payroll_received:label==='Reimbursements received'?currentReport.measures.reimbursement_received:null;const text=element('div',measure?.estimated_component>0?measure.status:note);text.className='small muted';p.append(text);$(label==='Purchases and bills'?'outflow-kpis':'kpis').append(p)});const wifePanel=element('div');wifePanel.className='panel';wifePanel.append(element('div','Wife contributions'));const wifeMonthly=currentReport.measures.expected_contribution.recorded_average_per_selected_month;const wifeValue=element('div',money(wifeMonthly));wifeValue.className='metric';wifePanel.append(wifeValue);const wifeLabel=element('div','Expected monthly contribution arrangement');wifeLabel.className='small';wifePanel.append(wifeLabel);const wifeMonths=$('period').value==='all'?data.months.length:1;const wifeTotal=element('div',money(currentReport.measures.expected_contribution.period_total)+' expected selected-period total');wifeTotal.className='small muted';wifePanel.append(wifeTotal);const wifeNote=element('div',referenceNote("reference_8"));wifeNote.className='small muted';wifePanel.append(wifeNote);$('kpis').append(wifePanel);const inflowMonths=$('period').value==='all'?data.months.length:1;const combinedInflow=reportMeasure('incoming_with_expected_funding');const inflowSummary=$('inflow-summary');inflowSummary.replaceChildren();const combinedAvg=element('div',money(currentReport.measures.incoming_with_expected_funding.recorded_average_per_selected_month)+' / month');combinedAvg.className='metric';inflowSummary.append(combinedAvg);const combinedTotal=element('div',money(combinedInflow)+' selected-period total');combinedTotal.className='small muted';inflowSummary.append(combinedTotal);const combinedNote=element('div','Recorded payroll + reimbursements received + classified wife funding + remaining expected contributions. Mixed-deposit allocations require review; wife deposits are not yet matched.');combinedNote.className='small muted';inflowSummary.append(combinedNote);
  $('legend').replaceChildren();groups.filter(g=>(reportSeries(currentReport,g)?.period_total??0)>0).forEach((g,i)=>{const s=element('button'),sw=element('span');s.setAttribute('aria-pressed',String(visibleGroups.has(g)));s.style.opacity=visibleGroups.has(g)?'1':'.45';sw.className='swatch';sw.style.background=categoryColors[g];const mm=$('period').value==='all'?data.months:[$('period').value];const avgShare=reportSeries(chartReport,g)?.average_recorded_monthly_share_percent??0;s.append(sw,document.createTextNode(g+' · '+(visibleGroups.has(g)?avgShare.toFixed(1)+'% avg':'off')));s.onclick=()=>{if(visibleGroups.has(g))visibleGroups.delete(g);else visibleGroups.add(g);render()};$('legend').append(s)});
@@ -103,7 +110,7 @@ function renderContent(){$('show-tata-funding').onchange=render;renderPlanning()
  table('wife-plan',['Bill','Expected/month'],currentReport.contribution_plan.items.map(item=>[item.bill,money(item.monthly_amount)]).concat([['Total',currentReport.contribution_plan.monthly_total===null?'Unknown':money(currentReport.contribution_plan.monthly_total)]]));
  $('funding-summary').replaceChildren(element('p','Classified wife receipts in selected period: '+money(currentReport.measures.wife_funding_received.period_total)),element('p',currentReport.contribution_plan.status),element('p','Matched reimbursement amount: not established'),element('p','Shared spending on your accounts: '+money(detailSeries(['kind','purpose']).find(series=>series.dimensions.purpose==='Household')?.period_total??0)));
 
- sourceInspector.refresh();renderAccounts();renderCommitments();renderBudget();renderTransactions();table('coverage-table',['Account','July records','August records','September records','Source status'],data.coverage.map(a=>[a.name,...data.months.map(m=>a.months[m]),a.status]));drawChart();renderPageHeroes();
+ sourceInspector.refresh();renderAccounts();renderCommitments();renderBudget();renderTransactions();drawChart();renderPageHeroes();
 }
 function merchantTable(series,total){
  const mm=currentReport.months,target=element('div');target.className='scroll';const tb=element('table'),head=element('tr');
@@ -195,7 +202,7 @@ const queuedSave=createSaveQueue(async document=>{
  if(res.status===409)return {ok:false,reason:'Another user saved changes. Export your edits, then reload before saving again.'};
  if(!res.ok)throw Error('Shared save failed. Changes remain unsaved; export edits before closing.');
  const result=await res.json();if(!Number.isInteger(result.revision)||result.revision!==revision+1)throw Error('Save revision not confirmed. Export edits and reload before retrying.');
- confirmedDecisions=structuredClone(document);data._revision=result.revision;recordSourceReader.invalidate();sourceInspector.clear();sourceInspector.refresh();++transactionRequest;transactionReport=null;return {ok:true,document};
+ confirmedDecisions=structuredClone(document);data._revision=result.revision;refreshContextDisplay();recordSourceReader.invalidate();sourceInspector.clear();sourceInspector.refresh();++transactionRequest;transactionReport=null;return {ok:true,document};
 });
 function updateDraftRecovery(){const button=$('discard-draft');button.hidden=!hasUnsavedChanges();button.disabled=queuedSave.pending>0;}
 async function save(){const pending=queuedSave(overrides);updateDraftRecovery();const result=await pending;updateDraftRecovery();if(!result.ok){$('save-status').textContent=result.reason;return false;}const current=JSON.stringify(overrides)===JSON.stringify(result.document);$('save-status').textContent=current?'Shared edits saved '+new Date().toLocaleTimeString():'Earlier edits saved; newer draft remains pending.';return current;}

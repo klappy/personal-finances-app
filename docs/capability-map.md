@@ -51,3 +51,9 @@ Existing import_preview/import_commit accept source_observations in the local wo
 ## Staged v0.5.29 record source descriptions
 
 Transaction source cells and editor source reads consume query/records source_evidence from record-query.mjs. Legacy source/account strings no longer establish a source type or bank match. The descriptor separates derivative and declared custody, conflicts, unknowns, parent locators and unverified reported origin. Editor reads are revision/request guarded and invalidated on confirmed save/applied reload. See contracts/record-source-evidence.md. Scoped review passes; protocol/rendered verification and Git-connected release remain pending.
+
+## Local context-custody follow-up
+
+Historical context fields now compose `query` / `snapshot` → contextEvidence. The status/as-of banner, reference notes and imported coverage table format the same descriptors exposed to HTTP and MCP. The month headings come from core snapshot month metadata. Historical notes are unfiltered context, independent of Home/Work/period; matching runtime references require an exact path and value, while original custody remains uncertified. Legacy transaction snapshot references cannot establish context-field custody. After a save advances the loaded revision, all context surfaces mark prior DTOs stale until reloaded. `coreMoneyCard` formats core metrics only; missing averages remain unavailable and no numeric fallback divides amounts in the browser.
+
+Local103-case core/authenticated HTTP/stdio comparisons include snapshot attachment at unchanged private revision3. This does not prove remote OAuth, deployed UI, source completeness or a whole-app parity percentage. Rendered validation and release gates remain pending for this unit.

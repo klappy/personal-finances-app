@@ -1,3 +1,4 @@
+import {coreMoneyCard} from '../frontend/context-evidence.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -57,16 +58,16 @@ test('cash hero uses core evidence status and avoids a spendable-balance or fina
  const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),renderer=source.slice(source.indexOf('function renderPageHeroes(){'),source.indexOf('function openTab(')),nodes=new Map();
  const element=(tag,text)=>({tag,text,style:{},className:'',children:[],append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children}}),$=id=>{if(!nodes.has(id))nodes.set(id,element('div'));return nodes.get(id)};
  $('period').value='2026-06';const metric=n=>({period_total:n,recorded_average_per_selected_month:n}),report={measures:{payroll_received:metric(0),reimbursement_received:metric(0),spending_commitment:metric(10),unallocated_received:metric(0),expected_contribution:metric(0),incoming_with_expected_funding:metric(0),funding_less_spending:metric(-10)},funding_comparison:{monthly_recorded_difference:null,missing_income_evidence_months:['2026-06']}};
- const context={$,element,currentReport:report,rows:()=>[],data:{months:['2026-06']},reportMeasure:key=>report.measures[key].period_total,planningItems:()=>[],money:String,activeTab:'cash',localStorage:{getItem:()=>null}};
+ const context={coreMoneyCard,$,element,currentReport:report,rows:()=>[],data:{months:['2026-06']},reportMeasure:key=>report.measures[key].period_total,planningItems:()=>[],money:String,activeTab:'cash',localStorage:{getItem:()=>null}};
  const text=node=>[node.text||'',...node.children.map(text)].join(' ');vm.runInNewContext(renderer+';renderPageHeroes();',context);let rendered=text($('page-heroes'));assert.match(rendered,/INCOME EVIDENCE INCOMPLETE/);assert.match(rendered,/Not established/);assert.doesNotMatch(rendered,/MONTHLY SPENDING GAP|MONTHLY INCOME REMAINING|Credit cards or savings may/);
  report.funding_comparison={monthly_recorded_difference:90,missing_income_evidence_months:[]};report.measures.funding_less_spending=metric(90);vm.runInNewContext('renderPageHeroes();',context);rendered=text($('page-heroes'));assert.match(rendered,/RECORDED FUNDING COMPARISON/);assert.match(rendered,/not a spendable balance/);assert.doesNotMatch(rendered,/MONTHLY INCOME REMAINING/);
 });
 
 test('confirmed notes save restores the source inspector without a full dashboard render',async()=>{
  const source=readFileSync(new URL('../frontend/controller.js',import.meta.url),'utf8'),callback=source.slice(source.indexOf('const queuedSave=createSaveQueue('),source.indexOf('function updateDraftRecovery()'));
- const previous=globalThis.document,node=tag=>({tag,textContent:'',children:[],append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children}});globalThis.document={createElement:node};
+ const previous=globalThis.document,node=tag=>({tag,textContent:'',children:[],append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children}});globalThis.document={createElement:node,querySelectorAll:()=>[]};
  try{const host=node('div'),status=node('p'),more=node('button'),data={_revision:3},queried=[];const inspector=createSourceInspector({host,status,more,getContext:()=>({revision:data._revision}),request:async()=>{queried.push(data._revision);return {revision:data._revision,total:0,items:[],summary:{candidate_links:0,candidate_targets_missing:0},accepted_matches:0};}});
- await inspector.refresh();const context={createSaveQueue,structuredClone,data,sourceInspector:inspector,recordSourceReader:{invalidate(){}},fetch:async()=>({ok:true,status:200,json:async()=>({revision:4})}),confirmedDecisions:{},transactionRequest:0,transactionReport:{old:true}};
+ await inspector.refresh();const context={refreshContextDisplay:()=>{},document:{querySelectorAll:()=>[]},createSaveQueue,structuredClone,data,sourceInspector:inspector,recordSourceReader:{invalidate(){}},fetch:async()=>({ok:true,status:200,json:async()=>({revision:4})}),confirmedDecisions:{},transactionRequest:0,transactionReport:{old:true}};
  const saved=await vm.runInNewContext(callback+';queuedSave({notes:"Updated notes"});',context);await Promise.resolve();assert.equal(saved.ok,true);assert.equal(data._revision,4);assert.deepEqual(queried,[3,4]);assert.match(status.textContent,/0 original source records/);assert.doesNotMatch(status.textContent,/unavailable/);assert.equal(context.transactionReport,null);
  }finally{globalThis.document=previous;}
 });
