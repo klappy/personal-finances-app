@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {empty,operate} from './core.mjs';
-const readOperations=new Set(['docs','query','summarize','coverage','import_preview','export']);
+const readOperations=new Set(['docs','query','summarize','coverage','import_preview','decision_preview','export']);
 export function store(filename,actor,provider=null){
  let queue=Promise.resolve();
  return(name,args)=>{

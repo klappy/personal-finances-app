@@ -2,9 +2,17 @@ export const classificationGroups=['Housing','Debt','Food','Shopping and home','
 export function sum(rr,key){return rr.reduce((s,r)=>s+(Number(r[key])||0),0)}
 export function purchasePlace(r){const s=r.merchant.toLowerCase();const rules=[[/toho\s*water|city\s*of\s*st[. ]*cloud/,'Water / sewer / trash'],[/wal.?mart/,'Walmart'],[/publix/,'Publix'],[/burger king/,'Burger King'],[/pei.?wei/,'Pei Wei'],[/starbucks/,'Starbucks'],[/atlas.?coffee/,'Atlas Coffee Club'],[/cielito/,'Cielito Coffee'],[/home.?depot/,'Home Depot'],[/coconuts/,'Coconuts'],[/doordash/,'DoorDash']];return rules.find(([p])=>p.test(s))?.[1]||r.merchant}
 export function billName(r){if(r.subscription_name)return r.subscription_name;if(r.parent_transaction_id)return r.merchant;const s=(r.merchant+' '+r.description).toLowerCase();const rules=[[/insperity/,'Insperity'],[/mission orlando/,'Mission Orlando'],[/compassion/,'Compassion'],[/partnershipfca/,'FCA'],[/northwestern/,'Northwestern Mutual'],[/health plans/,'Health Plans'],[/progressive/,'Progressive'],[/lemonade/,'Lemonade'],[/sofi/,'SoFi loan'],[/greystar/,'Greystar settlement'],[/kua|kissimmee util/,'KUA electricity'],[/toho\s*water|city\s*of\s*st[. ]*cloud/,'Water / sewer / trash'],[/t.mobile/,'T-Mobile'],[/spectrum/,'Spectrum'],[/cursor/,'Cursor'],[/openai/,'OpenAI'],[/anthropic/,'Anthropic'],[/lovable/,'Lovable'],[/cloudflare/,'Cloudflare'],[/elevenlabs/,'ElevenLabs'],[/github/,'GitHub'],[/google|youtube/,'Google / YouTube — products to split'],[/apple.com|apple services/,'Apple services — products to split'],[/netflix/,'Netflix'],[/hulu/,'Hulu'],[/audible/,'Audible'],[/prime video/,'Prime Video'],[/ring/,'Ring'],[/nest/,'Nest'],[/experian/,'Experian'],[/remarkable/,'reMarkable'],[/cookidoo/,'Cookidoo'],[/dashpass/,'DoorDash DashPass'],[/rocket money/,'Rocket Money'],[/manychat/,'ManyChat'],[/massive/,'Massive'],[/fyxer/,'Fyxer'],[/replicate/,'Replicate'],[/twilio/,'Twilio']];if(r.group==='Insurance'&&/northwestern/i.test(s))return 'Northwestern Mutual · '+r.category;if(r.group==='Insurance'&&/lemonade/i.test(s))return 'Lemonade · pet insurance';if(r.category==='Tithe')return 'Mission Orlando';if(r.category==='Kingdom Builder offering')return 'Mission Orlando · Kingdom Builder offering';if(r.category==='Mortgage')return 'Mortgage';if(/interest/i.test(r.category)||r.source_type==='Interest')return 'Card interest · '+r.account;return rules.find(([p])=>p.test(s))?.[1]||r.merchant}
-export function scopeRows(rows, scope='combined', commitments={}) {
+export function scopeAttribution(row,commitments={}){
+ const assigned=commitments[billName(row)]?.budgetScope;
+ if(assigned)return {scope:assigned==='work'?'work':'home',reason:'saved_commitment_assignment'};
+ if(row.purpose==='Business')return {scope:'work',reason:'business_purpose'};
+ if(row.work_receipt>0)return {scope:'work',reason:'work_receipt'};
+ if(row.inflow_role==='Mixed business income / reimbursement')return {scope:'work',reason:'mixed_business_inflow'};
+ return {scope:'home',reason:'home_default'};
+}
+export function scopeRows(rows,scope='combined',commitments={}){
  if(!['home','work','combined'].includes(scope))throw Error('Invalid scope');
- return rows.filter(r=>{const assigned=commitments[billName(r)]?.budgetScope;const work=assigned?assigned==='work':r.purpose==='Business'||r.work_receipt>0||r.inflow_role==='Mixed business income / reimbursement';return scope==='combined'||(scope==='work'?work:!work)});
+ return rows.filter(row=>scope==='combined'||scopeAttribution(row,commitments).scope===scope);
 }
 export const additiveMeasures=['spend','payroll','work_receipt','bank_card_repayment','refund','review_credit','business_payroll_estimate','reimbursement_estimate'];
 export function expandAllocations(parent, decisions={}) {
@@ -27,6 +35,7 @@ export function dashboardRows(data, overrides={}, options={}) {
  const hasSavedPurpose=row=>Object.hasOwn(overrides.transactions?.[row.id]||{},'purpose')||row.parent_transaction_id&&(Object.hasOwn(overrides.transactions?.[row.parent_transaction_id]||{},'purpose')||Object.hasOwn((overrides.transactions?.[row.parent_transaction_id]?.splits||original.get(row.parent_transaction_id)?.splits||[]).find(part=>part.id===row.id)||{},'purpose'));
  let rows=data.transactions.flatMap(r=>{const parent={...r,...(overrides.transactions?.[r.id]||{})};return expandAllocations(parent,overrides.transactions||{})});
  rows=rows.map(r=>!r.classification_reviewed&&!hasSavedPurpose(r)&&r.group==='Travel'&&r.travel_purpose==='Work'?{...r,purpose:'Business'}:r);
+ if(options.includeScopeAttribution)rows=rows.map(row=>({...row,scope_attribution:scopeAttribution(row,overrides.commitments||{})}));
  rows=scopeRows(rows,scope,overrides.commitments||{});
  return rows
  .map(r=>r.purpose==='Business'?{...r,original_group:r.group,group:'Business',category:r.group==='AI'?'AI · '+r.category:r.group==='Travel'?'Work travel · '+r.category:r.category}:r)

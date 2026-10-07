@@ -1,3 +1,4 @@
+import {decisionPreviewInputSchema} from './decision-preparation.mjs';
 // L5-owned operation schemas, effects and service routes.
 import {sourceObservationSchema} from './source-observations.mjs';
 import {classificationSchema} from './classification-contract.mjs';
@@ -11,15 +12,17 @@ export const operationDefinitions=[
  ['import_preview','Validate a normalized import without changing data',{rows:{type:'array',items:{type:'object'}},format:{type:'string',enum:['dashboard_snapshot','runtime_evidence','source_observations']},snapshot:{type:'object'},evidence:{type:'object'}},[]],
  ['import_commit','Commit normalized source records without duplicate spending',{revision:integer,idempotency_key:string,rows:{type:'array',items:{type:'object'}},format:{type:'string',enum:['dashboard_snapshot','runtime_evidence','source_observations']},snapshot:{type:'object'},evidence:{type:'object'}},['revision','idempotency_key']],
  ['classification_propose','Store a review-only classification proposal',{revision:integer,transaction_id:string},['revision','transaction_id']],
+ ['decision_preview','Prepare explicit transaction choices without applying dependent suggestions',decisionPreviewInputSchema.properties,decisionPreviewInputSchema.required],
  ['decision_update','Save dashboard curation and budget decisions with evidence history',{revision:integer,decisions:{type:'object',properties:{transactions:{type:'object'},budgets:{type:'object'},commitments:{type:'object'},notes:string},required:['transactions','budgets','commitments','notes'],additionalProperties:false}},['revision','decisions']],
  ['classification_review','Accept or reject a proposal with evidence and a revision check',{revision:integer,proposal_id:string,decision:{type:'string',enum:['accept','reject']},classification,evidence:string},['revision','proposal_id','decision','evidence']]
-].map(([name,description,properties,required])=>({name,description,inputSchema:{type:'object',properties,required,additionalProperties:false,...(['import_preview','import_commit'].includes(name)?{allOf:[{if:{properties:{format:{const:'source_observations'}},required:['format']},then:{properties:{evidence:sourceObservationSchema},required:['evidence']}}]}:{})},annotations:{readOnlyHint:!['import_commit','classification_propose','classification_review','decision_update'].includes(name),destructiveHint:name==='classification_review',idempotentHint:['docs','query','summarize','coverage','export','import_preview','import_commit'].includes(name),openWorldHint:false}}));
+].map(([name,description,properties,required])=>({name,description,inputSchema:{type:'object',properties,required,additionalProperties:false,...(['import_preview','import_commit'].includes(name)?{allOf:[{if:{properties:{format:{const:'source_observations'}},required:['format']},then:{properties:{evidence:sourceObservationSchema},required:['evidence']}}]}:{})},annotations:{readOnlyHint:!['import_commit','classification_propose','classification_review','decision_update'].includes(name),destructiveHint:name==='classification_review',idempotentHint:['docs','query','summarize','coverage','export','import_preview','decision_preview','import_commit'].includes(name),openWorldHint:false}}));
 export const operationRoutes={
  docs:{capability:'docs',args:{}},
  query:{capability:'query'},
  summarize:{capability:'project',operation:'summarize'},
  coverage:{capability:'project',operation:'coverage'},
  export:{capability:'query',args:{collection:'ledger'}},
+ decision_preview:{capability:'project',operation:'decision_preview'},
  import_preview:{capability:'project',operation:'import_preview'},
  import_commit:{capability:'execute',operation:'import_commit'},
  classification_propose:{capability:'execute',operation:'classification_propose'},
