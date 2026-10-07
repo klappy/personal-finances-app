@@ -3,6 +3,7 @@ import {dashboardRows,additiveMeasures} from './dashboard-domain.mjs';
 const plain=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
 const reserved=k=>['__proto__','constructor','prototype'].includes(k);
 const protectedFields=['account','account_key','date','month','amount','source','source_row','merchant'];
+const curationFields=new Set(['purpose','group','category','detail','evidence','inflow_role','insurance_type','travel_purpose','travel_city','reimbursement_status','reimbursement_amount','reimbursement_report','receipt_path','source_email_id','subscription_name','splits','recorded_spend',...additiveMeasures]);
 const statuses=['','Paid','Submitted','Draft','Eligible','Reimbursable','Not reimbursable','Not matched to report','Not reimbursed','Unresolved'];
 export function validateDecisions(state,input) {
  if(!plain(input)||!['transactions','budgets','commitments'].every(k=>plain(input[k]))||typeof input.notes!=='string'||input.notes.length>20000)throw Error('Invalid decision document');
@@ -13,6 +14,8 @@ export function validateDecisions(state,input) {
  function validateEntry(id,entry,baseline,child=false){
   if(reserved(id)||!ids.has(id)||!plain(entry))throw Error('Unknown transaction decision');
   for(const [field,value] of Object.entries(entry)){
+   if(field==='classification_reviewed')throw Error('Derived review state cannot be curated');
+   if(!curationFields.has(field)&&!(child&&field==='id')&&!protectedFields.includes(field)&&JSON.stringify(value)!==JSON.stringify(baseline[field]))throw Error('Unknown curation field');
    if(reserved(field)||field==='id'&&(!child||value!==id))throw Error('Immutable transaction field');
    if(protectedFields.includes(field)&&value!==baseline[field])throw Error('Immutable transaction field');
    if(['group','category'].includes(field)&&(typeof value!=='string'||!value.length||value.length>=150))throw Error('Invalid classification');

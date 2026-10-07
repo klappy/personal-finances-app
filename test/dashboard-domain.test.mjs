@@ -27,3 +27,7 @@ test('explicit travel purpose precedes scope; reimbursement eligibility does not
  const data={months:['2026-09'],transactions:[fixture('work',{group:'Travel',purpose:'Personal',travel_purpose:'Work'}),fixture('eligible',{group:'Travel',purpose:'Personal',reimbursement_status:'Eligible'})]};
  assert.deepEqual(dashboardRows(data,{}, {scope:'work'}).map(r=>r.id),['work']);assert.deepEqual(dashboardRows(data,{}, {scope:'home'}).map(r=>r.id),['eligible']);
 });
+
+test('explicit saved purpose wins over old travel inference',()=>{
+ const data={months:['2026-09'],transactions:[fixture('travel',{group:'Travel',travel_purpose:'Work',purpose:'Business'})]},overrides={transactions:{travel:{purpose:'Personal'}}};assert.equal(dashboardRows(data,overrides,{scope:'home'})[0].purpose,'Personal');assert.equal(dashboardRows(data,overrides,{scope:'work'}).length,0);
+});

@@ -17,5 +17,5 @@ export function dashboardSnapshot(state) {
  if(!state.dashboard_context)throw Error('Dashboard context not migrated');
  const context=structuredClone(state.dashboard_context);
  for(const review of state.reviews.filter(r=>r.status==='accepted')){const decision=context.overrides.transactions?.[review.transaction_id];if(decision)for(const field of ['group','category','purpose'])delete decision[field];}
- return {...context,transactions:Object.values(state.transactions).map(r=>({...structuredClone(r.attributes||{}),id:r.id,account:r.account,merchant:r.merchant,date:r.date,month:r.date.slice(0,7),amount:r.amount,spend:r.spend,...r.classification,...(state.reviews.some(v=>v.transaction_id===r.id&&v.status==='accepted')?{classification_reviewed:true}:{})})),_revision:state.revision};
+ return {...context,transactions:Object.values(state.transactions).map(r=>({...structuredClone(r.attributes||{}),id:r.id,account:r.account,merchant:r.merchant,date:r.date,month:r.date.slice(0,7),amount:r.amount,spend:r.spend,...r.classification,classification_reviewed:state.reviews.some(v=>v.transaction_id===r.id&&v.status==='accepted')})),_revision:state.revision};
 }

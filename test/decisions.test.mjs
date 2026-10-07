@@ -16,3 +16,7 @@ test('nested split reimbursement is validated and decision history is reconstruc
 test('removing a historical economic override also requires an explicit adjustment',async()=>{
  const snap=snapshot();snap.overrides.transactions.one={spend:0};const s=empty();await operate(s,'import_commit',{revision:0,idempotency_key:'seed',format:'dashboard_snapshot',snapshot:snap},'fixture');await assert.rejects(operate(s,'decision_update',{revision:1,decisions:{transactions:{},budgets:{},commitments:{},notes:''}},'fixture'),/explicit fact adjustment/);assert.equal(s.revision,1);
 });
+
+test('curation cannot turn off the core-derived accepted-review state',async()=>{
+ const snap=snapshot();snap.transactions[0].group='Travel';snap.transactions[0].travel_purpose='Work';const s=empty();await operate(s,'import_commit',{revision:0,idempotency_key:'seed',format:'dashboard_snapshot',snapshot:snap},'fixture');const proposal=await operate(s,'classification_propose',{transaction_id:'one',revision:1},'fixture');await operate(s,'classification_review',{proposal_id:proposal.id,revision:2,decision:'accept',classification:{group:'Travel',category:'Personal trip',purpose:'Personal'},evidence:'Fixture human confirmation'},'fixture');await assert.rejects(operate(s,'decision_update',{revision:3,decisions:{transactions:{one:{classification_reviewed:false}},budgets:{},commitments:{},notes:''}},'fixture'),/Derived review/);assert.equal((await operate(s,'query',{view:'dashboard',scope:'home'})).transactions[0].purpose,'Personal');assert.equal(s.revision,3);
+});

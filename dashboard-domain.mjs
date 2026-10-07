@@ -20,7 +20,7 @@ export function expandAllocations(parent, decisions={}) {
 export function dashboardRows(data, overrides={}, options={}) {
  const scope=options.scope||'combined', period=options.period||'all', months=data.months||[];
  let rows=data.transactions.flatMap(r=>{const parent={...r,...(overrides.transactions?.[r.id]||{})};return expandAllocations(parent,overrides.transactions||{})});
- rows=rows.map(r=>!r.classification_reviewed&&r.group==='Travel'&&r.travel_purpose==='Work'?{...r,purpose:'Business'}:r);
+ rows=rows.map(r=>!r.classification_reviewed&&!Object.hasOwn(overrides.transactions?.[r.id]||{},'purpose')&&r.group==='Travel'&&r.travel_purpose==='Work'?{...r,purpose:'Business'}:r);
  rows=scopeRows(rows,scope,overrides.commitments||{});
  return rows
  .map(r=>r.purpose==='Business'?{...r,original_group:r.group,group:'Business',category:r.group==='AI'?'AI · '+r.category:r.group==='Travel'?'Work travel · '+r.category:r.category}:r)

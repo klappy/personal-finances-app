@@ -31,3 +31,5 @@ Local UI/core save integration: legacy API adapter now queries the shared snapsh
 Save-command review corrections: reject invention/removal of economic measure overrides, validate nested reimbursement fields and protected identities, and preserve reconstructible before/after decision payloads. These guards apply before atomic commit. No production release.
 
 D1/Worker slice: deterministic read-only legacy normalization, CAS command persistence, and protected HTTP/MCP routing implemented. Thirty-three Node tests pass; Wrangler dry-run bundles successfully (70 KiB, no deployment). Existing real decisions validate without mutation; mixed-income text annotations stay unresolved rather than being fabricated numeric allocations. Frontend assets, actual D1/live auth verification and Git-triggered release are not yet delivered.
+
+Derived classification-review flags are now protected from curation and recomputed by core projection; arbitrary new curation fields are rejected while unchanged historical annotations remain preservable. Explicit saved purpose takes precedence over old travel inference. Regression coverage added; release still not performed.
