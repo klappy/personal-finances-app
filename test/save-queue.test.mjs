@@ -15,3 +15,17 @@ test('reload discards its response if a save starts and finishes while the read 
  let release,state={revision:1,notes:'old'},draft={notes:'new'};const gate=new Promise(resolve=>release=resolve),save=createSaveQueue(async document=>{state={revision:2,...document};return {ok:true};});
  const read=loadWithSaveGuard(save,{draft:()=>draft,read:async()=>{await gate;return {revision:1,notes:'old'};},apply:value=>state=value});await save(draft);release();await assert.rejects(read,/changed during reload/);assert.deepEqual(state,{revision:2,notes:'new'});
 });
+test('failed-save draft blocks ordinary reload; explicit discard reloads without overriding later edits',async()=>{
+ let persisted={notes:'saved'},draft={notes:'unsaved'},reads=0,confirmed=JSON.stringify(persisted);
+ const queue=createSaveQueue(async()=>({ok:false,reason:'offline'}));await queue(draft);
+ const options={draft:()=>draft,hasUnsavedChanges:()=>JSON.stringify(draft)!==confirmed,read:async()=>{reads++;return structuredClone(persisted)},apply:value=>{draft=value;confirmed=JSON.stringify(value)}};
+ await assert.rejects(loadWithSaveGuard(queue,options),/Unsaved edits/);assert.equal(reads,0);assert.equal(draft.notes,'unsaved');
+ await loadWithSaveGuard(queue,{...options,discardDraft:true});assert.equal(draft.notes,'saved');assert.equal(reads,1);
+ draft={notes:'another unsaved draft'};let release;const gate=new Promise(resolve=>release=resolve);
+ const reload=loadWithSaveGuard(queue,{...options,discardDraft:true,read:async()=>{await gate;return persisted}});draft.notes='newer edit during reload';release();await assert.rejects(reload,/changed during reload/);assert.equal(draft.notes,'newer edit during reload');
+});
+test('explicit discard cannot bypass pending saves and a failed read leaves the draft intact',async()=>{
+ let release,draft={notes:'keep'},applied=false;const gate=new Promise(resolve=>release=resolve),queue=createSaveQueue(async()=>{await gate;return {ok:false}}),pending=queue(draft);
+ const options={draft:()=>draft,hasUnsavedChanges:()=>true,discardDraft:true,read:async()=>{throw Error('read offline')},apply:()=>applied=true};
+ await assert.rejects(loadWithSaveGuard(queue,options),/pending saves/);release();await pending;await assert.rejects(loadWithSaveGuard(queue,options),/read offline/);assert.equal(draft.notes,'keep');assert.equal(applied,false);
+});

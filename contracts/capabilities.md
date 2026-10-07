@@ -55,3 +55,9 @@ Planning handlers merge changed fields into the current draft commitment at even
 
 ## Executable discovery ownership
 The L5 capability-contract.mjs catalog owns operation names, schemas, effects and service routes. Direct core docs and protocol discovery expose the same catalog; there is no separate abbreviated action list. Export maps to the existing query capability with collection ledger, returning the complete canonical state read-only. No fifth tool or page-specific endpoint is added. Some detailed validator constraints are still not encoded in schemas; this change fixes action discoverability rather than claiming complete schema coverage.
+
+## Evidence claims in presentation
+The overview must not assert reconciliation for named accounts from fixed copy. Verification is represented by core evidence projections and explicit line/balance controls; generic explanatory copy may describe what remains to verify. Expected contribution plans are labeled expected, not confirmed received funds. This changes presentation assertions, not source records or calculations.
+
+## Failed-save draft recovery
+Reloading source data must not replace a draft that differs from the last confirmed saved/loaded decision document. The client keeps the draft and offers export/save or an explicit Discard draft and reload action. Explicit discard does not bypass pending-save or read-crossed-by-edit guards; a failed reload retains the draft. This is local draft recovery, not a financial command or a new endpoint.

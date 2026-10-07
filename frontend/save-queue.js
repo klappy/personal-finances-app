@@ -10,8 +10,9 @@ export function createSaveQueue(write){
  };
  Object.defineProperties(save,{pending:{get:()=>pending},activity:{get:()=>activity}});return save;
 }
-export async function loadWithSaveGuard(queue,{draft,read,apply}){
+export async function loadWithSaveGuard(queue,{draft,read,apply,hasUnsavedChanges=()=>false,discardDraft=false}){
  if(queue.pending)throw Error('Wait for pending saves before reloading. Your draft remains available to export.');
+ if(hasUnsavedChanges()&&!discardDraft)throw Error('Unsaved edits remain in your draft. Save or export them, or choose Discard draft and reload.');
  const activity=queue.activity,captured=JSON.stringify(draft()),snapshot=await read();
  if(queue.activity!==activity||JSON.stringify(draft())!==captured)throw Error('Edits changed during reload. Source reload was discarded; your draft remains available to export.');
  apply(snapshot);
