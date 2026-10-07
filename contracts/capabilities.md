@@ -52,3 +52,6 @@ Accounts summaries accept scope and optional account_type only, independent of s
 
 ## Client draft and refresh integrity
 Planning handlers merge changed fields into the current draft commitment at event time, preserving sibling billing/scope/selection decisions across queued saves. Records display their canonical category and purpose; absent flow kinds are not invented. A failed projection refresh invalidates every dependent report and clears every calculated financial surface, while retaining unsaved draft data and editor controls for recovery. No new transport endpoint or financial calculation is introduced.
+
+## Executable discovery ownership
+The L5 capability-contract.mjs catalog owns operation names, schemas, effects and service routes. Direct core docs and protocol discovery expose the same catalog; there is no separate abbreviated action list. Export maps to the existing query capability with collection ledger, returning the complete canonical state read-only. No fifth tool or page-specific endpoint is added. Some detailed validator constraints are still not encoded in schemas; this change fixes action discoverability rather than claiming complete schema coverage.

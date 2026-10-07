@@ -26,7 +26,7 @@ This registration supplies missing evaluation inputs; it is not a passing lens r
 
 | Field | Project answer |
 |---|---|
-| AK-1 | Core/domain: core.mjs, classification-contract.mjs, snapshot.mjs, decisions.mjs, runtime-evidence.mjs and domain/projection modules listed in contracts/component-boundaries.md; protocol faces: http.mjs, mcp.mjs, worker.mjs, tools.mjs, auth.mjs; persistence: store.mjs, d1-store.mjs; providers: cloudflare-jev-provider.mjs, ma8ic-provider.mjs; client: frontend/; governance context: AGENTS.md, CLAUDE.md, boarding/manifest.md, contracts/, docs/, lenses/ and qa/. Resolve each Git blob at the evaluated build commit. |
+| AK-1 | Core/domain: core.mjs, capability-contract.mjs, classification-contract.mjs, snapshot.mjs, decisions.mjs, runtime-evidence.mjs and domain/projection modules listed in contracts/component-boundaries.md; protocol faces: http.mjs, mcp.mjs, worker.mjs, tools.mjs, auth.mjs; persistence: store.mjs, d1-store.mjs; providers: cloudflare-jev-provider.mjs, ma8ic-provider.mjs; client: frontend/; governance context: AGENTS.md, CLAUDE.md, boarding/manifest.md, contracts/, docs/, lenses/ and qa/. Resolve each Git blob at the evaluated build commit. |
 | AK-2 | Every listed construct is inside the evaluation remit. Application-domain ownership is L5; generic adapters do not gain domain ownership by sharing its process. |
 | AK-3 | contracts/component-boundaries.md v1, October 7, 2026: three enumerated boundary sections and explicit growth/removal statements. Fetch its current evaluated Git blob SHA. |
 | AK-4 | Core/domain/client/project documents L5; protocol/persistence/provider adapter components L2. No L4 agent or L6 settlement component is implemented. |
@@ -37,4 +37,4 @@ This registration supplies missing evaluation inputs; it is not a passing lens r
 | AK-9 | One application ledger only, with dev isolation; no generic KB-serving portability claim. Governing repositories are references, not served KBs. |
 | AK-10 | Maintainer Christopher Klapp; one Worker app deployment per isolated environment; docs/release.md defines Git-connected release. First production migration is not complete. |
 | AK-11 | Core/persistence are required for authoritative data/actions; replaceable protocol adapters enable their clients; UI enables the household journey. Boundary spec records dependency claims; removal trial unperformed. |
-| AK-12 | docs/release.md records technical corrections and evidence/gaps; cookbook rail owns governing decisions. No financial incident log has yet been established; do not claim one exists. |
+| AK-12 | docs/release.md records technical corrections and evidence/gaps; cookbook rail owns governing decisions. docs/incidents.md records technical incidents and links their fixes; cookbook rail retains governing decisions. |
