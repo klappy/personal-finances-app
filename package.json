@@ -1,6 +1,6 @@
 {
   "name": "finance-core-prototype",
-  "version": "0.5.16",
+  "version": "0.5.17",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,11 +8,17 @@
     "mcp": "node mcp.mjs",
     "serve": "node http.mjs",
     "build": "vite build && node scripts/audit-public-build.mjs dist",
-    "dev": "vite"
+    "dev": "vite",
+    "migrate:dev": "wrangler d1 migrations apply personal-finances-cookbook-dev --env development --remote",
+    "deploy:dev": "wrangler deploy --env development"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "svelte": "^5.57.2",
-    "vite": "^7.3.7"
+    "vite": "^7.3.7",
+    "wrangler": "4.148.0"
+  },
+  "overrides": {
+    "sharp": "0.35.5"
   }
 }

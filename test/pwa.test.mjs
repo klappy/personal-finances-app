@@ -10,3 +10,5 @@ test('service worker fetches financial requests from network without using offli
 });
 
 test('deployment configuration cannot bypass authentication by serving assets first',async()=>{const config=JSON.parse(await fs.readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8'));assert.equal(config.assets.directory,'./dist');assert.equal(config.assets.binding,'ASSETS');assert.equal(config.assets.run_worker_first,true);assert.equal(config.assets.not_found_handling,'none');assert.equal(config.workers_dev,false);assert.equal(config.preview_urls,false);});
+
+test('development deployment targets isolated storage and its own Access audience',async()=>{const config=JSON.parse(await fs.readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8')),dev=config.env.development;assert.notEqual(dev.name,config.name);assert.notEqual(dev.vars.APP_HOSTNAME,config.vars.APP_HOSTNAME);assert.notEqual(dev.vars.ACCESS_AUD,config.vars.ACCESS_AUD);assert.notEqual(dev.d1_databases[0].database_id,config.d1_databases[0].database_id);assert.equal(dev.assets.run_worker_first,true);assert.equal(dev.workers_dev,false);assert.equal(dev.preview_urls,false);});
