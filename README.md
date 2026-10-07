@@ -1,12 +1,12 @@
 # Shared finance core — experimental
 
-A working local core and two thin adapters: authenticated loopback HTTP and MCP stdio. Nine operations share contracts, import validation, revisions and classification review. Read contracts/capabilities.md and contracts/classification-v1.md before use.
+A working local core and two thin adapters: authenticated loopback HTTP and MCP stdio. Four public capability tools compose documented operations sharing contracts, import validation, revisions and classification review. Read contracts/capabilities.md and contracts/classification-v1.md before use.
 
 Run `npm test`. No dependencies are installed. Requires Node 22+.
 
 For Claude or another local MCP host, configure a stdio server invoking `node /absolute/path/mcp.mjs` with FINANCE_STATE_FILE pointing at a private JSON state file outside this code tree. MCP trust is the launching process, not remote login. Do not expose this transport on the Internet.
 
-For HTTP, set FINANCE_STATE_FILE and FINANCE_HTTP_TOKEN (random, at least 32 characters) out of band, then `npm run serve`. It binds 127.0.0.1:8767. POST /api/capability with Bearer authentication and JSON {name,args}. Browser-origin requests are rejected. This is a test adapter, not the production browser authentication flow. Separate processes serialize file access with an exclusive lock. An abandoned lock after a crash requires operator recovery after confirming no process owns it; it never silently steals a lock.
+For HTTP, set FINANCE_STATE_FILE and FINANCE_HTTP_TOKEN (random, at least 32 characters) out of band, then `npm run serve`. It binds 127.0.0.1:8767. POST /api/capability with Bearer authentication and JSON {name,args}; names are docs, query, project and execute. project/execute carry {operation,args}, with all underlying schemas discoverable through docs. Browser-origin requests are rejected. This is a test adapter, not the production browser authentication flow. Separate processes serialize file access with an exclusive lock. An abandoned lock after a crash requires operator recovery after confirming no process owns it; it never silently steals a lock.
 
 A normalized source row carries source_id, source_line, source_type (Era/Statement/Receipt; Snapshot for a derived migration source), transaction_id, account, merchant, date, amount, spend and classification {group,category,purpose}. Alternate-source matches require the same explicit transaction_id and exact canonical account/date/amount. Partial receipt bundles and posting-date shifts require further reconciliation contracts; this slice refuses to infer those joins.
 

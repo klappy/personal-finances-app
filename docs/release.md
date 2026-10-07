@@ -11,3 +11,5 @@ For the PWA verify protected assets, manifest, icon dimensions, no offline ledge
 Recovery: preserve source data and export reviewed decisions before a migration. Keep previous version/release evidence and a tested rollback. Do not reseed an initialized cloud ledger over user edits. Report a failed deployment or missing build binding as such, never as released.
 
 Observed October 6, 2026: public app repo klappy/personal-finances-app created; PR1 carries core, contracts and CI. Cloudflare repository connection d1353f1c-117a-475c-883c-763b4e4c7089 exists in the existing account. No build trigger is attached yet, since production Worker/UI source migration and deploy configuration are still pending. Existing Worker tag is 8eb88806585a416384b28aa4eaace0ed. Do not attach an automatic production trigger until its reviewed branch contains a runnable, protected deployment.
+
+House guidance promotion complete: kitchen#247 merge 5559ae1f1152b2fc4cee1ecde900d5b3cd4e1821 and kitchens#86 merge 7bab578e886e026688df161f29da27d97ddafa94. Terry remains draft; promotion is not activation.

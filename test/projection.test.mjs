@@ -9,7 +9,7 @@ test('shared projection scopes, cents and missing-month uncertainty are preserve
  const home=await operate(s,'summarize',args);assert.equal(home.period_total,40.30);assert.equal(home.recorded_average_per_selected_month,13.43);assert.deepEqual(home.monthly.map(m=>m.recorded_total),[10.30,null,30]);assert.equal(home.categories[0].verified_average_month,null);assert.equal(home.complete,false);
  assert.equal((await operate(s,'summarize',{...args,scope:'work'})).period_total,90);
  assert.equal((await operate(s,'summarize',{...args,scope:'combined'})).period_total,130.30);
- const result=await rpc({id:1,method:'tools/call',params:{name:'summarize',arguments:args}},(n,a)=>operate(s,n,a));assert.deepEqual(result.result.structuredContent,home);
+ const result=await rpc({id:1,method:'tools/call',params:{name:'project',arguments:{operation:'summarize',args}}},(n,a)=>operate(s,n,a));assert.deepEqual(result.result.structuredContent,home);
  const before=structuredClone(s);await assert.rejects(operate(s,'summarize',{...args,months:['2026-13']}),/valid months/);assert.deepEqual(s,before);
 });
 test('alternate receipt source does not change projected spending',async()=>{

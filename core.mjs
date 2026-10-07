@@ -1,3 +1,4 @@
+import {validateDecisions} from './decisions.mjs';
 import {recordedFlows,aggregateFlows} from './flows.mjs';
 import {normalizeDashboardSnapshot,dashboardSnapshot} from './snapshot.mjs';
 import {dashboardRows} from './dashboard-domain.mjs';
@@ -20,9 +21,13 @@ export async function operate(state,name,args={},actor=null,provider=null){
  if(['import_preview','import_commit'].includes(name)&&!snapshotContext&&Array.isArray(args.rows)&&args.rows.length>500)fail('Import requires 1–500 rows');
  const importDigest=()=>hash(snapshotContext?{rows:args.rows,context:snapshotContext}:args.rows);
  if(name==='import_commit'&&state.imports[args.idempotency_key]){if(!actor)fail('Authenticated actor required');const previous=state.imports[args.idempotency_key];if(previous.digest!==importDigest())fail('Idempotency content conflict');return previous;}
- const mutating=['import_commit','classification_propose','classification_review'].includes(name);if(mutating){if(!actor)fail('Authenticated actor required');if(args.revision!==state.revision)fail('Revision conflict');}
+ const mutating=['import_commit','classification_propose','classification_review','decision_update'].includes(name);if(mutating){if(!actor)fail('Authenticated actor required');if(args.revision!==state.revision)fail('Revision conflict');}
  if(name==='docs')return {version:VERSION,capabilities:['docs','query','summarize','coverage','import_preview','import_commit','classification_propose','classification_review','export'],classification_contract:'finance-classification@1',automatic_acceptance:false,jev_configured:!!provider,limitations:['Normalized imports only','No direct Era refresh','No PDF extraction','No remote OAuth','Not integrated into cloud dashboard']};
- if(name==='export')return structuredClone(state);
+ if(name==='decision_update'){const decisions=validateDecisions(state,args.decisions);const draft=structuredClone(state);draft.dashboard_context.overrides=decisions;
+  for(const [id,decision] of Object.entries(decisions.transactions)){const record=draft.transactions[id];if(record&&!decision.splits&&!record.attributes?.splits&&['group','category','purpose'].some(k=>Object.hasOwn(decision,k)))record.classification=classification({...record.classification,...Object.fromEntries(['group','category','purpose'].filter(k=>Object.hasOwn(decision,k)).map(k=>[k,decision[k]]))});}
+  const event={id:randomUUID(),actor,revision:state.revision+1,created_at:new Date().toISOString(),before:hash(state.dashboard_context.overrides),after:hash(decisions),kind:'decision_document_updated'};draft.decision_events=[...(draft.decision_events||[]),event];draft.revision++;Object.assign(state,draft);return {revision:state.revision,event_id:event.id};}
+ if(name==='export'||name==='query'&&args.collection==='ledger')return structuredClone(state);
+ if(name==='query'&&args.collection==='snapshot')return dashboardSnapshot(state);
  if(['query','summarize'].includes(name)&&args.collection==='flows'){
    const snapshot=state.dashboard_context?dashboardSnapshot(state):{months:[...new Set(Object.values(state.transactions).map(r=>r.date.slice(0,7)))],overrides:{},transactions:Object.values(state.transactions).map(r=>({...r,...r.classification,month:r.date.slice(0,7)}))};
    const rows=dashboardRows(snapshot,snapshot.overrides,{scope:args.scope,period:args.period,hideReimbursed:args.hide_reimbursed});

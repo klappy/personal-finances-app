@@ -6,7 +6,7 @@ test('flow composition cannot silently sum expense and settlement as the same ou
 });
 test('same composed collection and aggregation are exposed through MCP',async()=>{
  const s=empty();await operate(s,'import_commit',{revision:0,idempotency_key:'fixture',rows:[{source_id:'fixture',source_line:'1',transaction_id:'one',account:'fixture',merchant:'Fixture shop',date:'2026-09-01',amount:10,spend:10,source_type:'Statement',classification:{group:'Food',category:'Groceries',purpose:'Household'}}]},'fixture');
- const args={collection:'flows',scope:'home',group_by:['month','kind']},expected=await operate(s,'summarize',args),actual=await rpc({id:1,method:'tools/call',params:{name:'summarize',arguments:args}},(n,a)=>operate(s,n,a));assert.deepEqual(actual.result.structuredContent,expected);assert.equal(expected.totals[0].amount,10);assert.equal(expected.cash_balance_change_verified,false);
+ const args={collection:'flows',scope:'home',group_by:['month','kind']},expected=await operate(s,'summarize',args),actual=await rpc({id:1,method:'tools/call',params:{name:'project',arguments:{operation:'summarize',args}}},(n,a)=>operate(s,n,a));assert.deepEqual(actual.result.structuredContent,expected);assert.equal(expected.totals[0].amount,10);assert.equal(expected.cash_balance_change_verified,false);
 });
 
 test('mixed deposit allocations remain explicitly estimated and are not counted three times',()=>{
