@@ -1,0 +1,1 @@
+{"mcpServers":{"personal-finances":{"command":"node","args":["mcp.mjs"],"env":{"FINANCE_STATE_FILE":"${FINANCE_STATE_FILE}"}}}}
