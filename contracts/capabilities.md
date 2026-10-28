@@ -1,7 +1,7 @@
 # Finance capabilities v0.1 — experimental
 
 ## Intended outcome
-One finance core supplies the UI and MCP clients. Era is the default feed; immutable statements and receipts verify and backfill it. Source records are evidence, never additional spending. This first executable slice supports normalized imports, queries, proposals, review and export. Direct Era refresh, PDF/CSV extraction, remote MCP OAuth and cloud UI integration are pending adapters, not delivered capabilities.
+One finance core supplies the UI and MCP clients. Era is the default feed; immutable statements and receipts verify and backfill it. Source records are evidence, never additional spending. This executable slice supports normalized imports, queries, proposals, review and export. Bounded host-driven Era refresh is staged under docs/era-refresh.md; no recurring schedule or production refresh is active. PDF/CSV extraction and deployed client acceptance remain separate gates.
 
 ## Boundaries
 The core knows transaction identifiers, source references, classifications and review events. It does not know whether a merchant's purpose is true without reviewed evidence. It is not a bank, payment service, or reimbursement approval engine. Reimbursement eligibility, submission and received payment remain separate from category and Home/Work purpose.
@@ -25,6 +25,9 @@ Write calls require an authenticated actor from the transport, not an actor supp
 Synthetic tests: repeat import produces no duplicates; a changed key/body is rejected; conflicting lines never overwrite; explicit receipt links do not change totals; stale classifications cannot overwrite current ones; unreviewed/rejected proposals are never training examples; queries and summaries use the same core through HTTP and MCP. Real account/month coverage requires an independently reconciled statement; synthetic tests prove mechanics only.
 
 ## Shared spending projection slice
+
+Era refresh uses existing import_preview/import_commit with format `era_refresh` and an evidence envelope defined in docs/era-refresh.md. L5 validates complete bounded pages, exact account policy, posted status, currency, dates, signs, original source identity and explicit economic-kind mappings before any mutation. Same-key retry is unchanged; failed reads, conflicts and losing revision/CAS preserve the previous-good snapshot. Import receipts retain declared retrieval time separately from historical snapshot/balance dates and never certify complete months. Snapshot `available_months` permits browsing new records without changing baseline `months` or saved plans. No fifth tool, bank category change, credential, authentication grant or schedule is added.
+
 `summarize` with `view: spending`, explicit `months` (1–24 YYYY-MM values) and `scope: home|work|combined` returns period/category/month recorded spending, selected-month recorded averages and period shares. Home includes Household, Personal and Unresolved; Work includes Business. Null monthly values mean no recorded row, not certified zero. Verified min/max/average remain null until account/month coverage is independently certified. Recorded averages are explicitly provisional and cannot be used as a complete budget baseline. Currency accumulation is in integer cents. Period share is not the previous UI's average monthly share and must be labeled accordingly. This projection does not yet implement paid-reimbursement filtering, commitment assignment overrides or inflow/cashflow reconciliation; it must not replace those UI semantics until their contract is implemented. No new MCP tool is added.
 
 ## Lossless snapshot bridge and composed flow collections

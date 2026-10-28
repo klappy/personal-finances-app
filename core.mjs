@@ -1,4 +1,5 @@
 import {commitmentContract} from './commitment-contract.mjs';
+import {prepareEraRefresh,eraRefreshLimits} from './era-refresh.mjs';
 import {prepareDecisions,decisionPreviewOutputSchema} from './decision-preparation.mjs';
 import {contextEvidence,contextEvidenceSchema} from './context-evidence.mjs';
 import {observationLimits,sourceObservationSchema,validateSourceObservations,planSourceObservations,querySourceObservations,observationDigestInput} from './source-observations.mjs';
@@ -28,16 +29,29 @@ function classification(c){if(!c||!['group','category','purpose'].every(k=>typeo
 function validate(rows){if(!Array.isArray(rows)||!rows.length||rows.length>5000)fail('Import requires 1–500 rows');return rows.map(r=>{if(!r||!['source_id','source_line','transaction_id','account','merchant','date','source_type'].every(k=>typeof r[k]==='string'&&r[k].length>0&&r[k].length<300)||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||!Number.isFinite(r.amount)||!Number.isFinite(r.spend)||r.spend<0||!['Era','Statement','Receipt','Snapshot'].includes(r.source_type))fail('Invalid source row');return {...r,classification:classification(r.classification)};});}
 function plan(state,rows){const draft=structuredClone(state),result={new_sources:0,new_transactions:0,replays:0};for(const r of validate(rows)){const key=JSON.stringify([r.source_id,r.source_line]);if(draft.sources[key]){if(!equal(draft.sources[key],r))fail('Conflicting immutable source line');result.replays++;continue;}const t=draft.transactions[r.transaction_id];if(t){if(t.amount!==r.amount||t.date!==r.date||t.account!==r.account)fail('Canonical link conflict');}else{draft.transactions[r.transaction_id]={id:r.transaction_id,account:r.account,merchant:r.merchant,date:r.date,amount:r.amount,spend:r.spend,classification:r.classification,...(r.attributes?{attributes:structuredClone(r.attributes)}:{})};result.new_transactions++;}draft.sources[key]=r;result.new_sources++;}return{draft,result};}
 export async function operate(state,name,args={},actor=null,provider=null){
- let snapshotContext=null,runtimeEvidence=null,sourceObservations=null;
- if(args.format&&!['dashboard_snapshot','runtime_evidence','source_observations'].includes(args.format))fail('Unknown import format');
+ let snapshotContext=null,runtimeEvidence=null,sourceObservations=null,eraRefresh=null;
+ if(args.format&&!['dashboard_snapshot','runtime_evidence','source_observations','era_refresh'].includes(args.format))fail('Unknown import format');
+ if(['import_preview','import_commit'].includes(name)&&args.format==='era_refresh'){
+  if(args.rows!==undefined||args.snapshot!==undefined)fail('Era refresh cannot include normalized rows or snapshot');
+  if(!state.dashboard_context)fail('Existing dashboard context required before Era refresh');
+  eraRefresh=prepareEraRefresh(state,args.evidence);
+ }
  if(['import_preview','import_commit'].includes(name)&&args.format==='source_observations'){sourceObservations=validateSourceObservations(args.evidence);if(args.rows!==undefined||args.snapshot!==undefined)fail('Observation import cannot include canonical rows or snapshot');}
  if(['import_preview','import_commit'].includes(name)&&args.format==='runtime_evidence')runtimeEvidence=validateRuntimeEvidence(args.evidence);
  if(runtimeEvidence&&(args.rows!==undefined||args.snapshot!==undefined))fail('Runtime evidence import cannot also include transaction rows or a snapshot');
  if(['import_preview','import_commit'].includes(name)&&args.format==='dashboard_snapshot'){const normalized=normalizeDashboardSnapshot(args.snapshot);args={...args,rows:normalized.rows};snapshotContext=normalized.context;}
  if(['import_preview','import_commit'].includes(name)&&!snapshotContext&&Array.isArray(args.rows)&&args.rows.length>500)fail('Import requires 1–500 rows');
- const importDigest=()=>hash(sourceObservations?observationDigestInput(sourceObservations):runtimeEvidence|| (snapshotContext?{rows:args.rows,context:snapshotContext}:args.rows));
+ const importDigest=()=>hash(eraRefresh?eraRefresh.evidence:sourceObservations?observationDigestInput(sourceObservations):runtimeEvidence|| (snapshotContext?{rows:args.rows,context:snapshotContext}:args.rows));
  if(name==='import_commit'&&state.imports[args.idempotency_key]){if(!actor)fail('Authenticated actor required');const previous=state.imports[args.idempotency_key];if(previous.digest!==importDigest())fail('Idempotency content conflict');return structuredClone(previous);}
  const mutating=['import_commit','classification_propose','classification_review','decision_update'].includes(name);if(mutating){if(!actor)fail('Authenticated actor required');if(args.revision!==state.revision)fail('Revision conflict');}
+ if(eraRefresh){
+  const {draft,result}=eraRefresh.rows.length?plan(state,eraRefresh.rows):{draft:structuredClone(state),result:{new_sources:0,new_transactions:0,replays:0}};
+  const metadata={...eraRefresh.metadata,new_transactions:result.new_transactions};
+  if(name==='import_preview')return {...result,...metadata,revision:state.revision};
+  if(typeof args.idempotency_key!=='string'||!args.idempotency_key||args.idempotency_key.length>300||['__proto__','constructor','prototype'].includes(args.idempotency_key))fail('Invalid Era idempotency key');
+  const receipt={...result,...metadata,format:'era_refresh',digest:importDigest(),actor:structuredClone(actor),created_at:new Date().toISOString(),revision:state.revision+1};
+  draft.dashboard_context.era_refresh=metadata;draft.imports[args.idempotency_key]=receipt;draft.revision++;Object.assign(state,draft);return structuredClone(receipt);
+ }
  if(sourceObservations){
   const {draft,result,batch}=planSourceObservations(state,sourceObservations);
   if(name==='import_preview')return {...result,revision:state.revision,source_id:batch.source_id,source_hash:batch.source_hash};
@@ -53,7 +67,7 @@ export async function operate(state,name,args={},actor=null,provider=null){
   draft.dashboard_context.runtime_evidence_refs={...(draft.dashboard_context.runtime_evidence_refs||{}),[runtimeEvidence.source_id]:{source_id:runtimeEvidence.source_id,source_type:'Snapshot',source_hash:runtimeEvidence.source_hash,payload_hash:receipt.payload_hash,observed_at:runtimeEvidence.observed_at}};
   draft.imports[args.idempotency_key]=receipt;draft.revision++;Object.assign(state,draft);return receipt;
  }
- if(name==='docs')return structuredClone({version:VERSION,commitment_decision_contract:commitmentContract,decision_preview_contract:'decision-preparation@1',decision_preview_output_schema:decisionPreviewOutputSchema,context_evidence_contract:'context-custody@1',context_evidence_schema:contextEvidenceSchema,record_source_contract:'record-source-evidence@1',record_source_schema:recordSourceSchema,source_observation_limits:observationLimits,source_observation_schema:sourceObservationSchema,capabilities:operationDefinitions.map(operation=>operation.name),operations:operationDefinitions,operation_routes:operationRoutes,classification_contract:'finance-classification@1',automatic_acceptance:false,jev_configured:!!provider,limitations:['Normalized imports only','No direct Era refresh','No PDF extraction','Remote OAuth client grant and deployed parity unverified','Production promotion and deployed parity verification pending']});
+ if(name==='docs')return structuredClone({version:VERSION,era_refresh_limits:eraRefreshLimits,era_refresh_contract:'era-refresh@1',commitment_decision_contract:commitmentContract,decision_preview_contract:'decision-preparation@1',decision_preview_output_schema:decisionPreviewOutputSchema,context_evidence_contract:'context-custody@1',context_evidence_schema:contextEvidenceSchema,record_source_contract:'record-source-evidence@1',record_source_schema:recordSourceSchema,source_observation_limits:observationLimits,source_observation_schema:sourceObservationSchema,capabilities:operationDefinitions.map(operation=>operation.name),operations:operationDefinitions,operation_routes:operationRoutes,classification_contract:'finance-classification@1',automatic_acceptance:false,jev_configured:!!provider,limitations:['Era refresh requires authorized host reader and explicit private account/category policy; no schedule activated','No PDF extraction','Remote OAuth client grant and deployed parity unverified','Production promotion and deployed parity verification pending']});
  if(name==='decision_preview')return prepareDecisions(state,args);
  if(name==='decision_update'){const decisions=validateDecisions(state,args.decisions);const draft=structuredClone(state);draft.dashboard_context.overrides=decisions;
   for(const [id,decision] of Object.entries(decisions.transactions)){const record=draft.transactions[id];if(record&&!decision.splits&&!record.attributes?.splits&&['group','category','purpose'].some(k=>Object.hasOwn(decision,k)))record.classification=classification({...record.classification,...Object.fromEntries(['group','category','purpose'].filter(k=>Object.hasOwn(decision,k)).map(k=>[k,decision[k]]))});}
